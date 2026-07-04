@@ -1,0 +1,927 @@
+[
+  {
+    "id": "test_001",
+    "topic": "Python 装饰器 functools.wraps",
+    "user_messages": [
+      "Python 装饰器 functools.wraps 忘记写 函数名 __name__ 全变成 wrapper",
+      "用了 @log 装饰器后 help(func) 显示的不是原始 docstring 很难调试",
+      "加了 functools.wraps 还是报错 TypeError: descriptor '__name__' requires a 'function'",
+      "查了一下是装饰器链里 wraps 传递顺序搞反了 inner_wrapper 漏了一层"
+    ],
+    "assistant_messages": [
+      "functools.wraps(func) 必须在 wrapper 内层调用 它会复制 __name__ __doc__ __module__ 等元信息到 wrapper 上",
+      "如果 help() 还是显示 wrapper 通常是装饰器链上没有逐层透传 wraps 每一层装饰器都要写",
+      "这个 TypeError 多半出现在 @staticmethod 之上又包了一层装饰器 顺序错了 wraps 拿到的是 descriptor 而不是 function",
+      "把装饰器从外到内逐层加 wraps 然后用 inspect.signature 检查最终签名"
+    ],
+    "expected_recall_query": "Python 装饰器 wraps",
+    "expected_top_segment": "test_001"
+  },
+  {
+    "id": "test_002",
+    "topic": "Rust 生命周期注解",
+    "user_messages": [
+      "Rust 借用检查器报错 lifetime annotation needed 结构体里存了引用",
+      "struct Config 字段是 &str 编译器让我加 'a 写哪都报错",
+      "加了 'a 后函数返回的 Cow 又有问题 生命周期对不上",
+      "换成 String 倒是能编译但是每次都要 clone 性能不太行"
+    ],
+    "assistant_messages": [
+      "结构体持有引用就必须用生命周期标注 struct Config<'a> { name: &'a str }",
+      "Cow<'a, str> 用法是 enum Cow<'a, str> { Borrowed(&'a str) Owned(String) } 按需选择",
+      "M1 阶段先用 String 性能不是瓶颈 等压测出来再说 不要过早优化",
+      "想 zero-copy 的话入参和返回都加 'a 标注即可 全链路用同一生命周期"
+    ],
+    "expected_recall_query": "Rust 生命周期 注解",
+    "expected_top_segment": "test_002"
+  },
+  {
+    "id": "test_003",
+    "topic": "TypeScript 类型守卫",
+    "user_messages": [
+      "TypeScript 类型守卫 typeof instanceof 写不出来 联合类型 narrow 不到具体类型",
+      "自己定义的类型 Cat | Dog 用 if 里 typeof 检查只能得到 string",
+      "想按 kind 字段区分猫狗 写了 in 操作符还是报错 Property kind does not exist on never"
+    ],
+    "assistant_messages": [
+      "用 in 操作符做自定义类型谓词 function isCat(pet Fish): pet is Cat { return (pet as Cat).kind === 'cat' }",
+      "interface Fish { kind: string } 作为公共判别字段返回类型是 Fish | Cat | Dog 用 in 'kind' in pet 可以 narrow",
+      "never 出现说明前面分支已经穷尽 推荐用 discriminated union + exhaustiveness check 让编译器帮你兜底"
+    ],
+    "expected_recall_query": "TypeScript 类型守卫",
+    "expected_top_segment": "test_003"
+  },
+  {
+    "id": "test_004",
+    "topic": "Go context 取消传播",
+    "user_messages": [
+      "Go context.WithCancel goroutine 没收到取消信号 父协程 cancel 了 子协程还在跑",
+      "goroutine 泄漏排查 ps 显示一堆 sleep 状态的 go routine",
+      "用 pprof 看 goroutine 栈 死锁在 <-ch 处 父 ctx.Done() 没接",
+      "最后发现子协程里只 select <-time.After(5s) 没加 ctx.Done() 分支"
+    ],
+    "assistant_messages": [
+      "子协程必须 select <-ctx.Done() 才退出 标准范式 select { case <-ctx.Done(): return case <-time.After(d): doWork() }",
+      "WithTimeout WithDeadline 底层都是 WithCancel + timer 传 ctx 时务必把 ctx 透传到所有 IO 操作",
+      "goroutine 泄漏排查用 runtime.NumGoroutine() 打点加 -debug 标志 goleak 工具更直接",
+      "任何阻塞 select 都要至少有 ctx.Done 分支 这是 Go 并发的肌肉记忆"
+    ],
+    "expected_recall_query": "Go context 取消",
+    "expected_top_segment": "test_004"
+  },
+  {
+    "id": "test_005",
+    "topic": "MySQL 覆盖索引",
+    "user_messages": [
+      "MySQL 慢查询 EXPLAIN 显示 Using where Using filesort 怎么优化",
+      "联合索引 idx_a_b_c 但 select b c 没用到 a 走了 filesort",
+      "业务上既要按 a 过滤又要按 b 排序 只能再建一个 idx_a_b 吗",
+      "explain 看到 Extra 列变 Using index 性能立刻 10 倍 这就是覆盖索引吧"
+    ],
+    "assistant_messages": [
+      "把查询列也加到联合索引里 实现 covering index Extra 列出现 Using index 表示无需回表",
+      "联合索引列顺序要严格匹配 最左前缀 a 是必须的 排序如果能命中前导列也能省 filesort",
+      "不一定要再建索引 把 c 加到 idx_a_b 后 索引可以覆盖整个查询场景 索引宽度是关键",
+      "覆盖索引的代价是写入放大和存储空间 业务写入频率高就要权衡 OLTP 场景慎用宽索引"
+    ],
+    "expected_recall_query": "MySQL 覆盖索引",
+    "expected_top_segment": "test_005"
+  },
+  {
+    "id": "test_006",
+    "topic": "Redis 缓存穿透 布隆过滤器",
+    "user_messages": [
+      "Redis 缓存穿透 不存在的 key 每次都打 DB 接口超时",
+      "恶意用户用随机 ID 攻击我们的详情接口 QPS 直接打满",
+      "试过 null 缓存但是污染严重 内存扛不住",
+      "布隆过滤器误判率 1% 内存 16MB 能装 1000 万 key 够用吗"
+    ],
+    "assistant_messages": [
+      "用布隆过滤器挡住 null 请求 所有 key 先过过滤器 bit array 实现 内存极省",
+      "布隆过滤器一定会有误判 命中率不是 100% 真正不存在的 key 也会被放行 1% 左右",
+      "null 缓存要加 TTL 而且只缓存那些命中过的 null 不要无差别缓存 不然才是真的内存污染",
+      "1000 万 key 用 1% 误判大概 12MB 内存 完全够 但过滤器重建是大工程 提前想好滚动方案"
+    ],
+    "expected_recall_query": "Redis 缓存穿透",
+    "expected_top_segment": "test_006"
+  },
+  {
+    "id": "test_007",
+    "topic": "Kafka 消费者积压 lag",
+    "user_messages": [
+      "Kafka 消费者消息积压 lag 越来越大 监控告警频繁",
+      "offset monitor 显示 lag 100 万条 单 consumer 根本消费不过来",
+      "横向扩了 2 个 consumer 后 rebalance 半天分配不均",
+      "加大 fetch size 也没用 单条消息处理慢 业务里有同步 DB 调用"
+    ],
+    "assistant_messages": [
+      "增加分区数 + 横向扩 consumer 实例 consumer 数 ≤ 分区数 否则空转",
+      "rebalance 不均多半是 session timeout 设太短 让 consumer 心跳正常 之后用 StickyAssignor 减少抖动",
+      "单条慢就要异步化 消息入 in-memory queue 后台 worker 批量写 DB 解耦消费和落库",
+      "高级方案是分区 key 打散 + 局部有序 业务上能容忍即可批量处理 3 提升 10 倍不是梦"
+    ],
+    "expected_recall_query": "Kafka 消息积压",
+    "expected_top_segment": "test_007"
+  },
+  {
+    "id": "test_008",
+    "topic": "Linux 僵尸进程 defunct",
+    "user_messages": [
+      "Linux 出现大量僵尸进程 defunct 杀不掉 看着就慌",
+      "ps aux 显示 STAT 是 Z 用 kill -9 完全无效",
+      "父进程是个 server 没退出僵尸就一直留着",
+      "重启父进程后僵尸自动消失 但是新版本又出现了"
+    ],
+    "assistant_messages": [
+      "kill -9 父进程让 init 接管回收 僵尸进程是已经死掉但没被 wait 的进程 必须父进程 wait",
+      "在父进程加 SIGCHLD handler waitpid(-1 WNOHANG) 循环回收 短生命周期的子进程需要这个习惯",
+      "长期不退的父进程会一直积累僵尸 直到父进程退出 PID 才被 init 接管",
+      "代码层面 fork 完立即 waitpid 别留尾巴 或者用 double fork 让孙子进程被 init 收养"
+    ],
+    "expected_recall_query": "Linux 僵尸进程",
+    "expected_top_segment": "test_008"
+  },
+  {
+    "id": "test_009",
+    "topic": "Docker bridge 网络容器互通",
+    "user_messages": [
+      "Docker bridge 网络下容器之间 ping 不通 都是 default bridge 出来的",
+      "docker inspect 看 IP 都是 172.17.0.x 但是容器内 nc 测试拒绝连接",
+      "用 --link 参数能通但是被标记为 deprecated 不推荐",
+      "创建自定义 bridge network 然后 docker run --network xxx 才能互联吧"
+    ],
+    "assistant_messages": [
+      "用 docker network connect 加入同一网络 或者直接用自定义 network 启动 docker network create mynet",
+      "default bridge 没有自动 DNS 容器只能用 IP 通信 而自定义 bridge 内置 DNS 可以用 service name",
+      "--link 是 deprecated 不要再用 一是环境变量注入限制多 二是只在 default bridge 生效",
+      "生产环境 compose 里 networks 显式声明 多 service 通信用 docker compose 自动编排 DNS 服务发现"
+    ],
+    "expected_recall_query": "Docker bridge 网络",
+    "expected_top_segment": "test_009"
+  },
+  {
+    "id": "test_010",
+    "topic": "Q3 周报复盘",
+    "user_messages": [
+      "本周完成召回引擎重构 Q3 目标达成 95% 还有 5% 落在哪里",
+      "L0 不可变那块卡了三天 触发器性能没达到预期",
+      "下周聚焦 LLM 接入层 老板又给加了一个 MCP Server 的预研",
+      "Q3 个人 OKR 完成度自查 92 分 跨部门协作拖了一点后腿"
+    ],
+    "assistant_messages": [
+      "未达成 5% 主要在数据迁移那块 旧 SQLite 文件没导出干净 建议补 2 天收尾",
+      "触发器性能可以加 EXPLAIN QUERY PLAN 看具体慢在哪 是 INSERT 还是 UPDATE 触发链",
+      "MCP Server 预研建议放 Q4 先把 LLM 接入层做完 不要并行多目标",
+      "OKR 复盘要写在共享文档里 让 leader 知道你做了什么 不要只是自己看"
+    ],
+    "expected_recall_query": "Q3 周报 复盘",
+    "expected_top_segment": "test_010"
+  },
+  {
+    "id": "test_011",
+    "topic": "产品 PRD 评审",
+    "user_messages": [
+      "PRD 文档写了三版 业务方还不满意 每次评审都被打回",
+      "业务方说看不懂 用户故事和流程图都没有",
+      "需求调研只做了 2 个核心用户 缺少边缘场景",
+      "PRD 模板是不是得加上用户旅程图和验收标准 让他们一看就懂"
+    ],
+    "assistant_messages": [
+      "画用户旅程图比文字描述更直观 横轴时间纵轴触点 一图讲清楚",
+      "PRD 加上 use case table 列前置条件 触发 主流程 异常 分支 验收点",
+      "调研要有代表性 用户分层做 核心用户 高频用户 偶发用户 各采 3 个就够",
+      "PRD 评审 checklist 写给业务方看 包括功能边界 不做清单 反例比正例更说明问题"
+    ],
+    "expected_recall_query": "产品 PRD 评审",
+    "expected_top_segment": "test_011"
+  },
+  {
+    "id": "test_012",
+    "topic": "合同违约金条款",
+    "user_messages": [
+      "合同违约金条款写成合同总额 30% 对方不接受 觉得太高",
+      "客户法务说中国合同法上限是实际损失 30% 超出 不合理",
+      "改成逾期部分每日万分之五 但客户运营说这样太轻量级",
+      "最后用两段式 基础 5% + 逾期万分之五 上限 20% 这能过吗"
+    ],
+    "assistant_messages": [
+      "改成逾期部分每日万分之五 即年化 18.25% 比较符合市场惯例",
+      "中国合同法违约金以补偿为主 惩罚性需明确说明依据 30% 对方有权拒签",
+      "两段式是行业常见方案 基础违约金覆盖合同履行成本 逾期利息覆盖时间成本",
+      "建议附加律师审阅条款 关键商业合同让法务过一遍 不要省这个时间"
+    ],
+    "expected_recall_query": "合同 违约金",
+    "expected_top_segment": "test_012"
+  },
+  {
+    "id": "test_013",
+    "topic": "晋升答辩准备",
+    "user_messages": [
+      "晋升答辩 PPT 准备了三周 评委问技术深度 怎么破",
+      "评委喜欢问架构演进 我讲了当前架构但是没讲演进史",
+      "踩坑案例准备了一个 QPS 万级到十万级的 全链路压测 那次上线差点挂掉",
+      "答辩 30 分钟包括 5 分钟提问 时间分配 20 讲 10 答疑"
+    ],
+    "assistant_messages": [
+      "多讲架构演进和踩坑案例 这是高 P 必备 评委看的是判断力和反思深度",
+      "演进史从 v1.0 一路讲到 v3.0 每个版本解决什么问题 留下什么债",
+      "踩坑案例的标准结构 背景 决策 反演 结果 反思 后续动作 闭环要好",
+      "时间倒推练习 PPT 浓缩到 18 页 每页讲 1 分钟 留足 Q&A 时间"
+    ],
+    "expected_recall_query": "晋升 答辩 准备",
+    "expected_top_segment": "test_013"
+  },
+  {
+    "id": "test_014",
+    "topic": "高级架构师 JD",
+    "user_messages": [
+      "高级架构师 JD 写了 30 条要求 没人投 HR 都急了",
+      "JD 列了一堆中间件 Kafka Redis ElasticSearch Flink 全栈要求",
+      "面了几个候选人都是某一两项强 其他很多不会",
+      "老板说要找 T10 级别的 全栈架构师 还要带过 50 人团队"
+    ],
+    "assistant_messages": [
+      "聚焦 3 个核心能力 删掉锦上添花的 30 条里能砍 25 条",
+      "JD 写能力而非技术栈 分布式系统设计 高并发优化 团队管理 三点足矣",
+      "T10 级别在阿里就是 P8 P9 之间 全栈架构师基本是传说 找到擅长两块的人就行",
+      "50 人团队在中国一般对应 P9+ 大厂总监级 招聘预算不在一个量级 要么降级要么加钱"
+    ],
+    "expected_recall_query": "架构师 招聘 JD",
+    "expected_top_segment": "test_014"
+  },
+  {
+    "id": "test_015",
+    "topic": "业务立项评审",
+    "user_messages": [
+      "新业务立项评审被驳回 ROI 不清晰 财务那边卡住了",
+      "做了一个 18 个月财务模型 对方说假设不靠谱",
+      "收入预测基于 TAM 10% 转化 老板质疑 10% 哪来的",
+      "成本侧用了乐观值 中间值 悲观值 三套 但对方只认悲观值"
+    ],
+    "assistant_messages": [
+      "补三套财务测算模型 区分乐观中观悲观 同时给出触发条件",
+      "TAM 10% 转化要给出 reference case 类似公司类似业务的历史数据",
+      "财务模型不可证伪就要被质疑 加上 sensitivity analysis 关键变量 ±20% 看 IRR 变化",
+      "悲观值场景下保持 IRR > 15% 才有立项可能 否则项目天然不过"
+    ],
+    "expected_recall_query": "业务 立项 评审",
+    "expected_top_segment": "test_015"
+  },
+  {
+    "id": "test_016",
+    "topic": "跨部门协作",
+    "user_messages": [
+      "跨部门协作产品研发测试三方拉齐 耗时两周还在踢皮球",
+      "产品说要等 UI 出图 UI 说等交互定稿 交互说要等 PRD",
+      "最后发现是没有主导人 大家都在等",
+      "leader 拉了一个对齐会议 30 分钟决议了三件事 才开始动起来"
+    ],
+    "assistant_messages": [
+      "三个角色需要有 single owner 即产品经理最终决策 否则都在等",
+      "PRD 先出文本版 不需要 UI 设计稿也能让开发先 mock 数据结构",
+      "关键时刻需要 leader 站台背书 给下面人压力 推动力比流程更有效",
+      "后续用 RACI 矩阵明确每个事项的 R A C I 谁负责 谁审批 谁咨询 谁知会"
+    ],
+    "expected_recall_query": "跨部门 协作",
+    "expected_top_segment": "test_016"
+  },
+  {
+    "id": "test_017",
+    "topic": "血脂体检偏高",
+    "user_messages": [
+      "体检报告显示血脂偏高 低密度脂蛋白超标 4.9",
+      "总胆固醇 6.2 甘油三酯 2.1 医生说先饮食控制三个月",
+      "他汀类药物要不要吃 医生说 40 岁以下无其他风险先不吃药",
+      "饮食上具体怎么吃 哪些要忌口"
+    ],
+    "assistant_messages": [
+      "少吃内脏 多吃深海鱼 三文鱼 沙丁鱼富含 Omega3 帮助降血脂",
+      "LDL 4.9 还算可控 三个月后复查如降到 3.4 以下就继续食控",
+      "他汀有肌肉痛肝损伤副作用 40 岁以下无糖尿病高血压确实先食控",
+      "忌口清单 动物内脏 油炸食品 肥肉 蛋黄每周不超 4 个 戒酒"
+    ],
+    "expected_recall_query": "血脂 体检 偏高",
+    "expected_top_segment": "test_017"
+  },
+  {
+    "id": "test_018",
+    "topic": "宝宝辅食添加",
+    "user_messages": [
+      "六个月宝宝辅食先加米粉还是菜泥 老人说要先喝米汤",
+      "儿科医生说高铁米粉是首选 强化铁吸收好",
+      "菜泥什么时候加 是先加根茎类还是叶菜",
+      "宝宝吃完胡萝卜泥大便里有橙色颗粒是消化不好吗"
+    ],
+    "assistant_messages": [
+      "先高铁米粉 再根茎类蔬菜泥 最后水果和肉类 一周加一种排敏",
+      "米汤营养密度低 不能替代辅食 这是几十年前的旧观念",
+      "根茎先于叶菜 红薯南瓜土豆胡萝卜 排敏后再加菠菜白菜",
+      "橙色颗粒是正常现象 辅食初期宝宝消化能力有限 1-2 周会改善"
+    ],
+    "expected_recall_query": "宝宝 辅食 添加",
+    "expected_top_segment": "test_018"
+  },
+  {
+    "id": "test_019",
+    "topic": "装修水电改造预算",
+    "user_messages": [
+      "水电改造报价一万八 100 平是不是被坑了",
+      "装修公司说按米数算 水管电管分开走 强电弱电分管",
+      "邻居说自己家 80 平只花了八千 我是不是选贵了",
+      "报价单上没写材料品牌 只写了联塑 那联塑有分几个系列"
+    ],
+    "assistant_messages": [
+      "按米数算 一般 80 平 60 米左右 100 平差不多 80-100 米 单价 200-300 元/米",
+      "水管电管分开走是规范做法 强电弱电分管 30cm 距离避免信号干扰",
+      "邻居价格做参考 但要看他家是不是全改 还是局部改 全改确实贵",
+      "联塑有 A 优 B 工程 C 家用 报价只写联塑没写系列就是模糊报价 让他明确写"
+    ],
+    "expected_recall_query": "水电 改造 预算",
+    "expected_top_segment": "test_019"
+  },
+  {
+    "id": "test_020",
+    "topic": "杭州西湖一日游",
+    "user_messages": [
+      "西湖一日游 断桥残雪 雷峰塔 怎么安排时间合适",
+      "西湖十景一天看不完 优先 3 个 怎么选",
+      "中午吃饭去楼外楼还是外婆家 都说本地人不去楼外楼",
+      "灵隐寺要不要去 听说很远 要单独安排半天"
+    ],
+    "assistant_messages": [
+      "早上断桥 中午楼外楼 下午灵隐 时间分配 早 9-11 断桥 12 楼外楼午餐 2-5 灵隐",
+      "西湖十景选三个经典 断桥 雷峰塔 三潭印月 时间紧就舍弃三潭在船上欣赏",
+      "楼外楼是游客选择 本地推荐知味观 绿茶 新白鹿 性价比更好",
+      "灵隐距离西湖 30 分钟车程 单独安排半天更充裕 早上 8 点出发"
+    ],
+    "expected_recall_query": "西湖 一日游",
+    "expected_top_segment": "test_020"
+  },
+  {
+    "id": "test_021",
+    "topic": "红烧肉做法",
+    "user_messages": [
+      "红烧肉总是炖得太柴 不够软烂 是不是选肉有问题",
+      "买的五花肉已经让摊主切好了 但是肥瘦层不分明",
+      "炖煮时间我开大火 1 小时收汁 结果太干",
+      "冰糖炒糖色这一步总是炒糊 有没有不炒糖色的办法"
+    ],
+    "assistant_messages": [
+      "选带皮五花肉 三肥两瘦 切 4cm 见方 太薄容易炖干",
+      "肥瘦分层不分明说明是机器切 让摊主用手切 或者自己回家修整",
+      "要小火慢炖两小时 中途不开盖 最后大火收汁 5 分钟就够",
+      "不炒糖色可以用老抽上色 + 冰糖煮化 风味稍逊但操作简单零失败"
+    ],
+    "expected_recall_query": "红烧肉 做法",
+    "expected_top_segment": "test_021"
+  },
+  {
+    "id": "test_022",
+    "topic": "猫咪绝育手术",
+    "user_messages": [
+      "猫咪绝育手术前后注意事项 多大做比较合适",
+      "公猫母猫价格差很多 母猫贵一倍 因为是开腹手术",
+      "术前禁食禁水 8 小时我家猫早上 6 点吃了一点要不要改时间",
+      "术后要不要戴伊丽莎白圈 公猫还好母猫一直舔伤口"
+    ],
+    "assistant_messages": [
+      "六个月以上 手术更安全 母猫避开发情期 减少出血",
+      "母猫是开腹手术 摘除卵巢子宫 价格是公猫 2-3 倍合理",
+      "6 点进食不算术前 8 小时禁食 从现在算起往后推 8 小时即可",
+      "必须戴圈 母猫伤口感染会很麻烦 用软圈或者手术服替代 7-10 天"
+    ],
+    "expected_recall_query": "猫咪 绝育",
+    "expected_top_segment": "test_022"
+  },
+  {
+    "id": "test_023",
+    "topic": "健身减脂计划",
+    "user_messages": [
+      "健身减脂计划 有氧 + 力量怎么安排一周几次",
+      "体脂率 28% BMI 26 想 3 个月减到 22",
+      "早上空腹有氧听说掉肌肉 真的吗",
+      "饮食上 1500 大卡够吗 蛋白质摄入怎么算"
+    ],
+    "assistant_messages": [
+      "一周 3 次力量 + 2 次有氧 间隔做 力量后做有氧燃脂更好",
+      "每周减 0.5-1kg 是健康范围 3 个月减 12-15% 体脂率可行",
+      "空腹有氧确实会消耗更多肌肉 提前吃 BCAA 或香蕉是好做法",
+      "蛋白质 1.6g/kg 体重 是减脂期推荐 1500 大卡够 但分配要 40% 蛋白 30% 脂肪 30% 碳水"
+    ],
+    "expected_recall_query": "健身 减脂 计划",
+    "expected_top_segment": "test_023"
+  },
+  {
+    "id": "test_024",
+    "topic": "英语单词记忆法",
+    "user_messages": [
+      "英语单词老是记不住 背了又忘 有没有高效记忆法",
+      "我用百词斩每天 100 个 但是 80% 都是模糊认识",
+      "试过艾宾浩斯遗忘曲线 表格做起来太麻烦放弃了",
+      "词根词缀法是不是更科学 比如词根 spect 看"
+    ],
+    "assistant_messages": [
+      "词根词缀法配合场景例句 200 个常用词根能覆盖 70% 学术词汇",
+      "百词斩只是图像联想 真正记住需要主动回忆 用 Anki 间隔重复算法",
+      "艾宾浩斯可以用 Anki 自动计算复习时间 不需要自己做表",
+      "记忆黄金法 三遍法 早中晚各过一遍 第二天再过 不背诵而是自测"
+    ],
+    "expected_recall_query": "英语单词 记忆",
+    "expected_top_segment": "test_024"
+  },
+  {
+    "id": "test_025",
+    "topic": "PMP 备考经验",
+    "user_messages": [
+      "PMP 备考三个月够吗 题目刷多少合适",
+      "看了第六版 PMBOK 但是看不进去 太厚 600 多页",
+      "准备报培训机构 慧谷 中元 华夏 各有什么优劣",
+      "5A 通过率是多少 必须 5A 才有 PMP 证书吗"
+    ],
+    "assistant_messages": [
+      "三个月够用 每天 2 小时 重点在敏捷部分占 50% 传统瀑布占 50% 改版后",
+      "第六版 PMBOK 是参考 不是教材 直接看机构讲义 + 题目效率更高",
+      "慧谷老师讲得细 中元练习题质量高 华夏视频好 综合选慧谷",
+      "5A 是参考 不是必须 3A 就能拿到证书 But 5A 写在简历上有亮点"
+    ],
+    "expected_recall_query": "PMP 备考",
+    "expected_top_segment": "test_025"
+  },
+  {
+    "id": "test_026",
+    "topic": "深度学习课程笔记",
+    "user_messages": [
+      "李宏毅深度学习课程 Lecture 1 听完了 重点是机器学习三步骤",
+      "Loss 函数设计 选择 Cross-entropy 还是 MSE",
+      "梯度下降 SGD Adam RMSProp 的区别 实际工程怎么选",
+      "Batch Normalization 放哪里 放在激活函数前还是后"
+    ],
+    "assistant_messages": [
+      "三步骤 模型 + 损失 + 优化 是机器学习的最小循环",
+      "分类任务 Cross-entropy 回归任务 MSE 是基本选择 多分类必选交叉熵",
+      "Adam 是默认选择 RMSProp 适合稀疏梯度 SGD 配合动量通常不输 Adam",
+      "BN 原始论文是激活函数前 现代实践 Pre-activation 效果更好 注意 ResNet 改进"
+    ],
+    "expected_recall_query": "深度学习 课程 笔记",
+    "expected_top_segment": "test_026"
+  },
+  {
+    "id": "test_027",
+    "topic": "历史书阅读笔记",
+    "user_messages": [
+      "读《资治通鉴》周纪 部分最深刻的感受是什么",
+      "三家分晋 田氏代齐 反映了什么历史规律",
+      "春秋战国 500 年为什么战争密度这么高",
+      "商鞅变法对后世的影响 法家思想如何收场"
+    ],
+    "assistant_messages": [
+      "周纪核心是礼崩乐坏 制度失效才有乱世 制度滞后是根本原因",
+      "三家分晋是礼乐制度解体的标志 周天子失去仲裁能力",
+      "战争密度高本质是规则真空 大家都在重新定义规则 试错过程",
+      "商鞅死于秦 但秦用法家统一后 秦亡于法家过严 物极必反"
+    ],
+    "expected_recall_query": "资治通鉴 阅读 笔记",
+    "expected_top_segment": "test_027"
+  },
+  {
+    "id": "test_028",
+    "topic": "高考数学复习",
+    "user_messages": [
+      "高考数学 90 天冲刺计划 怎么安排",
+      "基础题错太多 是不是公式没记牢",
+      "导数大题做不出来 拉分点但是花了很多时间",
+      "概率题每次计算都对 但最后答案是错的 为什么"
+    ],
+    "assistant_messages": [
+      "90 天分三段 前 30 天扫基础 中 30 天专题 后 30 天模拟 每天 2.5 小时",
+      "基础题错说明公式应用不熟 不是没记 是情境识别弱 用错题本分类汇总",
+      "导数题挑 1-2 个套路练熟就好 不要全面进攻 把时间留给中档题",
+      "概率题最后错很可能是组合数算错 或者互斥事件判断错 用穷举法验证"
+    ],
+    "expected_recall_query": "高考 数学 复习",
+    "expected_top_segment": "test_028"
+  },
+  {
+    "id": "test_029",
+    "topic": "钢琴练习方法",
+    "user_messages": [
+      "成人学钢琴 三个月能弹什么水平",
+      "599 拜厄 哈农 599 顺序是怎样的",
+      "一首新曲子 总是中间断指法 应该怎么练",
+      "节拍跟不上 是不是要先分手练 还是跟节拍器"
+    ],
+    "assistant_messages": [
+      "成人三个月能弹车尔尼 599 后半部分 简单流行曲 拜厄 30-40 条",
+      "顺序 哈农练指法 → 拜厄练识谱 → 车尔尼练技术 → 奏鸣曲练表现力",
+      "中间断指法说明还没形成肌肉记忆 分手慢练 5 遍对再合手 速度提到 60 起步",
+      "必须分手慢练 + 节拍器从 60 起步 跟节拍器是肌肉和节奏同步的关键"
+    ],
+    "expected_recall_query": "钢琴 练习 方法",
+    "expected_top_segment": "test_029"
+  },
+  {
+    "id": "test_030",
+    "topic": "雅思口语备考",
+    "user_messages": [
+      "雅思口语 6.5 一个月够准备吗 工作党时间紧",
+      "Part 2 抽到不熟悉的题 现场编故事 容易卡顿",
+      "语音语调怎么练 native speaker 的连读吞音",
+      "口语题库换题季 5 月 9 月 这时候考试会碰上新题吗"
+    ],
+    "assistant_messages": [
+      "一个月冲 6.5 紧但可行 重点 Part 2 题库准备 50 个故事覆盖高频话题",
+      "准备 20 个通用故事模板 Part 2 7 成题目能套上去 减少临场压力",
+      "听 BBC VOA 跟读 用影子跟读法 影子不要快于原音频 5 遍起步",
+      "5 月 9 月换题季建议避开 或者考前一两个月再报名 等题库稳定"
+    ],
+    "expected_recall_query": "雅思 口语 备考",
+    "expected_top_segment": "test_030"
+  },
+  {
+    "id": "test_031",
+    "topic": "短对话 - 一条问候",
+    "user_messages": [
+      "你好世界",
+      "今天有什么好的建议"
+    ],
+    "assistant_messages": [
+      "你好呀 今天有什么我可以帮你的",
+      "试试问技术问题 学习问题 或者聊聊生活 健康 都行"
+    ],
+    "expected_recall_query": "问候",
+    "expected_top_segment": "test_031"
+  },
+  {
+    "id": "test_032",
+    "topic": "短对话 - 两轮答疑",
+    "user_messages": [
+      "Docker compose down 和 stop 区别",
+      "那 down 删不删除 volume"
+    ],
+    "assistant_messages": [
+      "stop 是停掉容器 不删容器 down 是停容器 + 删除容器 + 默认网络",
+      "down 默认带 -v 才删除 volume 普通 down 保留 volume 数据"
+    ],
+    "expected_recall_query": "Docker compose",
+    "expected_top_segment": "test_032"
+  },
+  {
+    "id": "test_033",
+    "topic": "短对话 - 三轮简答",
+    "user_messages": [
+      "PYTHONPATH 是什么",
+      "怎么临时设置",
+      "永久生效呢"
+    ],
+    "assistant_messages": [
+      "模块搜索路径 环境变量 用法是 export PYTHONPATH=/path/to/modules",
+      "临时用 export 或者 python -m 设置 只在当前 shell 生效",
+      "写入 ~/.bashrc 或 .zshrc 然后 source 一下 全局生效"
+    ],
+    "expected_recall_query": "PYTHONPATH",
+    "expected_top_segment": "test_033"
+  },
+  {
+    "id": "test_034",
+    "topic": "短对话 - 极简咨询",
+    "user_messages": [
+      "Visa 卡哪家好",
+      "申请流程复杂吗"
+    ],
+    "assistant_messages": [
+      "招行 Visa 全币种免年费 兑换汇率友好 商旅推荐经典白",
+      "招行流程简单 准备好身份证收入证明 10 个工作日内批卡"
+    ],
+    "expected_recall_query": "Visa 卡",
+    "expected_top_segment": "test_034"
+  },
+  {
+    "id": "test_035",
+    "topic": "短对话 - 一句话问答",
+    "user_messages": [
+      "Python list tuple 区别",
+      "性能差多少"
+    ],
+    "assistant_messages": [
+      "list 可变 [] tuple 不可变 () 性能 tuple 略好",
+      "纯查询无差别 大量元素时 tuple 实例化稍快 实际工程不敏感"
+    ],
+    "expected_recall_query": "list tuple 区别",
+    "expected_top_segment": "test_035"
+  },
+  {
+    "id": "test_036",
+    "topic": "长对话 - 注意力机制讨论",
+    "user_messages": [
+      "今天来讨论大型语言模型的注意力机制",
+      "多头注意力 multi-head 的作用是什么",
+      "位置编码 positional encoding 怎么做",
+      "LayerNorm 放在 MHA 前还是后",
+      "Pre-LN 和 Post-LN 哪种训练更稳定",
+      "总结一下注意力机制的演进历史",
+      "MoE 和 MHA 怎么组合",
+      "FlashAttention 优化点在哪",
+      "Linear Attention 解决了什么问题",
+      "Mamba 这种 SSM 是不是要替代 Attention"
+    ],
+    "assistant_messages": [
+      "自注意力 self-attention 计算 QKV 三元组点积注意力",
+      "并行多组注意力 捕获不同子空间 不同 head 学不同模式",
+      "正弦位置编码或 RoPE 旋转位置编码 RoPE 是目前主流",
+      "Pre-LN 训练更稳定 Post-LN 表达能力强 但要 warmup",
+      "Pre-LN 是当前主流 GPT LLaMA 都用 post-LN 在 Vision Transformer 还在用",
+      "MHA -> MQA -> GQA -> MLA 推理加速逐步减少 KV cache",
+      "MoE 替换 FFN 层 与 MHA 组合成 sparse MoE 推理时只激活部分专家",
+      "FlashAttention IO aware kernel 避免 O N 平方的 HBM 写入 速度提升 2-4 倍",
+      "Linear Attention 用核函数近似 softmax O N 复杂度 长序列下优势明显",
+      "Mamba SSM 在长序列推理速度上超越 Transformer 但语言建模能力略逊 各有应用场景"
+    ],
+    "expected_recall_query": "注意力机制 大模型",
+    "expected_top_segment": "test_036"
+  },
+  {
+    "id": "test_037",
+    "topic": "长对话 - 装修细节咨询",
+    "user_messages": [
+      "装修预算 25 万够吗 90 平两室一厅",
+      "硬装 软装 各占多少比例",
+      "瓷砖选 800x800 还是 600x1200 显大气",
+      "木地板选实木还是复合 适合北方地暖",
+      "全屋定制柜子用什么板材 环保等级",
+      "中央空调 vs 风管机 怎么选",
+      "新风系统有必要装吗",
+      "智能家居做不做 米家还是苹果 HomeKit",
+      "卫生间防水刷几遍 高度刷到哪",
+      "墙面用乳胶漆还是壁布 哪个好打理"
+    ],
+    "assistant_messages": [
+      "够 但要严格控预算 全包 18 万 半包 12 万 + 主材家具家电 13 万",
+      "硬装 60% 软装 40% 比例 现在流行重软装 轻硬装",
+      "客厅 800x800 视觉简洁 卧室 600x1200 显空间大 看你户型",
+      "北方地暖推荐实木复合 多层结构稳定性好 锁扣安装",
+      "爱格 F4 星 > 欧标 E0 国标 E1 大厂都用爱格 吉林森工露水河",
+      "风管机价格低 单空间控制 中央空调造价高 5 万起步 但美观度高",
+      "新房通风差或者雾霾严重建议装 否则就是摆设 米家 352 远大主流",
+      "性价比选米家 智能化本地化都成熟 苹果 HomeKit 适合果粉全屋",
+      "卫生间淋浴区 1.8 米 其他区域 30cm 涂刷 2-3 遍闭水试验 48 小时",
+      "乳胶漆好打理 壁布质感好 看空间 大面积乳胶漆 局部壁布点睛"
+    ],
+    "expected_recall_query": "装修 预算 细节",
+    "expected_top_segment": "test_037"
+  },
+  {
+    "id": "test_038",
+    "topic": "长对话 - 家庭理财咨询",
+    "user_messages": [
+      "家庭理财 100 万闲钱怎么配置",
+      "稳健为主 能承受 10% 浮动",
+      "股票基金 比例多少合适",
+      "固收+ 是什么 比存款好吗",
+      "纯债基金风险大吗",
+      "黄金 ETF 适合长期持有吗",
+      "指数基金定投还是一次性",
+      "保险占多少预算 算不算投资",
+      "美元资产要不要配置 人民币贬值预期",
+      "房产还值得投资吗 现在"
+    ],
+    "assistant_messages": [
+      "100 万建议 30% 稳健 40% 平衡 20% 进取 10% 现金 按风险偏好评定",
+      "10% 浮动意味着稳健 50%+ 平衡 30% 进取 20% 是配置上限",
+      "股票基金占比 20-30% 长期年化 8-10% 短期有波动",
+      "固收+ 是债基 + 少量股票 收益 4-6% 比存款高 比股票稳",
+      "短债基金风险很小 中长债基金有利率风险 持有 1 年以上较稳",
+      "黄金 ETF 作为对冲 占 5-10% 长期能跑赢通胀",
+      "指数基金定投胜率高 一次性对择时要求高 普通投资者选定投",
+      "保障类保险占年收入 5-10% 理财型不算投资是负债 要警惕",
+      "5-10% 美元资产配置 防止单一货币风险 QDII 基金或者港股通",
+      "自住必买 投资慎重 一线仍可 三四线多套要卖 政策环境长期不利"
+    ],
+    "expected_recall_query": "家庭 理财 配置",
+    "expected_top_segment": "test_038"
+  },
+  {
+    "id": "test_039",
+    "topic": "长对话 - 小说构思",
+    "user_messages": [
+      "想构思一部科幻短篇小说 主题是记忆交易",
+      "主角设定 失意中年程序员 妻子去世三年",
+      "反派对位 一个黑市记忆贩子",
+      "第一幕开场 公司被裁 走在雨中",
+      "第二幕 接到神秘电话 得知妻子可能留下记忆印记",
+      "第三幕 追溯到地下记忆黑市",
+      "高潮 主角发现记忆全是伪造的",
+      "反转 卖家也是受害者 背后组织在制造情感幻觉",
+      "结尾 主角在雨中重新开始接受现实",
+      "金句设计 你买的不是记忆 是后悔的药"
+    ],
+    "assistant_messages": [
+      "主题记忆交易有市场痛点 科幻设定可以用神经接口 + 区块链",
+      "失意中年 + 亡妻 这种设定有情感共鸣 程序员的现实挣扎加分",
+      "黑市记忆贩子是经典反派 但要复杂化 不能纯粹坏",
+      "开篇用雨声 一步慢镜头 让读者跟随主角感受失意",
+      "神秘电话是关键 hook 要强悬念 否则读者走神",
+      "地下黑市可以扩展成完整世界观 但短篇要点到为止",
+      "记忆是伪造的 反转有点刻意 但放在前面铺垫 OK",
+      "背后组织加分 这让冲突升级 不只是个人故事",
+      "雨开始又雨结束 完美循环结构 给读者完整感",
+      "金句提升档次 影视化潜力大 改剧本可以在结尾用"
+    ],
+    "expected_recall_query": "小说 构思 科幻 记忆",
+    "expected_top_segment": "test_039"
+  },
+  {
+    "id": "test_040",
+    "topic": "长对话 - 英语学习规划",
+    "user_messages": [
+      "英语学习 一年规划 目标雅思 7.5",
+      "当前水平六级 500 分",
+      "每天 3 小时时间分配怎么搞",
+      "听力怎么练 BBC 还是 VOA",
+      "口语要不要找外教 一对一贵不贵",
+      "写作 图表作文 议论文 哪个是难点",
+      "阅读 词汇量要求多少 8000 还是 1 万",
+      "剑雅真题怎么做 什么时候开始",
+      "机考还是笔考 哪个好",
+      "口语题库是机经吗 命中率"
+    ],
+    "assistant_messages": [
+      "一年冲 7.5 可行 分三段 前 3 月打基础 中 6 月刷题 后 3 月冲刺",
+      "六级 500 对应雅思 5.5 起步 7.5 需要 2 分提升 一年合理",
+      "3 小时分配 听力 1h 阅读 1h 口语写作 1h 周末加一套真题",
+      "BBC 难度太大 先用 VOA 常速 后期再 BBC 雅思是英澳发音",
+      "外教必要 每周 1-2 次 200 一节 性价比高 雅思前考官优先",
+      "议论文是难点 图表作文模板化训练即可 大作文 250 字占分重",
+      "7.5 对应词汇 7500-8500 涵盖高频学术词 加上词根词缀大概",
+      "剑雅 4-17 共 14 本 前 6 本基础 后 8 本模考 考前 2 个月进模考",
+      "机考出分快 5-7 天 笔考 10 天 机考体验更好 写作打字快",
+      "口语题库命中率 95% 以上 必背题库 流利度比准确度重要"
+    ],
+    "expected_recall_query": "英语 学习 规划 雅思",
+    "expected_top_segment": "test_040"
+  },
+  {
+    "id": "test_041",
+    "topic": "多话题 - 三大球类",
+    "user_messages": [
+      "今天聊篮球 比赛精彩瞬间 NBA 总决赛 G7",
+      "今天聊足球 比赛精彩瞬间 世界杯决赛点球",
+      "今天聊网球 比赛精彩瞬间 大满贯抢七"
+    ],
+    "assistant_messages": [
+      "篮球 NBA 总决赛 G7 运动员发挥稳定 关键时刻三分绝杀",
+      "足球 世界杯决赛点球 运动员发挥稳定 门将扑出关键球",
+      "网球 大满贯抢七 运动员发挥稳定 Ace 球数量创纪录"
+    ],
+    "expected_recall_query": "篮球 足球 网球 比赛",
+    "expected_top_segment": "test_041"
+  },
+  {
+    "id": "test_042",
+    "topic": "多话题 - 三大手机品牌",
+    "user_messages": [
+      "苹果 iPhone 16 Pro 评测 信号真的有改善吗",
+      "华为 Mate70 Pro 麒麟芯片回归 系统流畅度",
+      "小米 15 Ultra 拍照能力 徕卡镜头"
+    ],
+    "assistant_messages": [
+      "苹果 iPhone 系统流畅 iOS 生态完善 信号有改善但仍不如安卓旗舰",
+      "华为 Mate 麒麟芯片回归 系统流畅度追平第一梯队 5G 全栈国产",
+      "小米 15 Ultra 拍照能力顶级 徕卡镜头调色有特色 性价比突出"
+    ],
+    "expected_recall_query": "苹果 华为 小米 手机",
+    "expected_top_segment": "test_042"
+  },
+  {
+    "id": "test_043",
+    "topic": "多话题 - 三大咖啡品类",
+    "user_messages": [
+      "美式咖啡 健身党最爱 黑咖啡怎么选豆",
+      "拿铁咖啡 新手入门 牛奶比例多少",
+      "卡布奇诺 经典意式 奶泡厚度要求"
+    ],
+    "assistant_messages": [
+      "美式 黑咖啡 健身党 零糖零脂 豆子选中深烘焙 酸苦平衡",
+      "拿铁 牛奶 1:5 浓缩 30ml 牛奶 200ml 新手入门首选",
+      "卡布奇诺 浓缩 30ml 牛奶 100ml 奶泡 100ml 奶泡厚度 1cm"
+    ],
+    "expected_recall_query": "美式 拿铁 卡布 咖啡",
+    "expected_top_segment": "test_043"
+  },
+  {
+    "id": "test_044",
+    "topic": "多话题 - 三种聚餐形式",
+    "user_messages": [
+      "火锅聚餐 预算 100/人 食材清单",
+      "烧烤聚餐 预算 80/人 食材清单",
+      "日料聚餐 预算 200/人 食材清单"
+    ],
+    "assistant_messages": [
+      "火锅 牛肉卷 羊肉卷 各一斤 蔬菜拼盘 毛肚鸭肠各一盘",
+      "烧烤 牛肉串 50 串 鸡翅 20 个 烤茄子金针菇各一盘",
+      "日料 三文鱼刺身 北极贝 各一盘 鳗鱼饭一份 天妇罗一份"
+    ],
+    "expected_recall_query": "火锅 烧烤 日料",
+    "expected_top_segment": "test_044"
+  },
+  {
+    "id": "test_045",
+    "topic": "多话题 - 三种音乐风格",
+    "user_messages": [
+      "摇滚乐队 Live 票价 阵容决定一切",
+      "民谣音乐节 小众清新 适合周末",
+      "爵士酒吧 即兴演奏 适合约会"
+    ],
+    "assistant_messages": [
+      "摇滚 Live 阵容决定一切 Oasis 落幕 二手玫瑰 痛仰 各有特色",
+      "民谣音乐节 草莓 简单生活节 小众清新 周末两天最佳",
+      "爵士酒吧 演艺吧 Blue Note 即兴演奏 适合约会 品酒享受"
+    ],
+    "expected_recall_query": "摇滚 民谣 爵士 音乐",
+    "expected_top_segment": "test_045"
+  },
+  {
+    "id": "test_046",
+    "topic": "工具调用 - 天气查询",
+    "user_messages": [
+      "查一下北京今天天气",
+      "穿衣建议呢"
+    ],
+    "tool_messages": [
+      {"role": "tool", "content": "{\"temp\": 25, \"desc\": \"晴\", \"humidity\": 35, \"wind\": \"3级\"}"}
+    ],
+    "assistant_messages": [
+      "我调用天气 API 给你查 北京今天 25 度 晴 湿度 35% 风力 3 级",
+      "建议穿薄长袖加外套 早晚温差大 注意补水防晒"
+    ],
+    "expected_recall_query": "北京 天气",
+    "expected_top_segment": "test_046"
+  },
+  {
+    "id": "test_047",
+    "topic": "工具调用 - 数据库查询",
+    "user_messages": [
+      "统计一下昨天订单总数",
+      "客单价呢"
+    ],
+    "tool_messages": [
+      {"role": "tool", "content": "{\"orders\": 1247, \"gmv\": 184523.5, \"avg_price\": 147.97}"}
+    ],
+    "assistant_messages": [
+      "查询 orders 表 where created_at = yesterday 昨天总订单 1247 单",
+      "总 GMV 184,523 元 客单价 147.97 元 同比上升 8%"
+    ],
+    "expected_recall_query": "订单 统计 数据库",
+    "expected_top_segment": "test_047"
+  },
+  {
+    "id": "test_048",
+    "topic": "工具调用 - 中英翻译",
+    "user_messages": [
+      "翻译一下这句话 The early bird catches the worm",
+      "反译回英文 看看地道吗"
+    ],
+    "tool_messages": [
+      {"role": "tool", "content": "{\"translation\": \"早起的鸟儿有虫吃\", \"back_translation\": \"The early bird gets the worm\"}"}
+    ],
+    "assistant_messages": [
+      "调用翻译 API 返回 早起的鸟儿有虫吃 这是英语谚语 直译意译都可以",
+      "反译回 The early bird gets the worm 比原句更地道 但语义一致"
+    ],
+    "expected_recall_query": "翻译 中英",
+    "expected_top_segment": "test_048"
+  },
+  {
+    "id": "test_049",
+    "topic": "工具调用 - 文件读取",
+    "user_messages": [
+      "读一下 README.md 文件第一段",
+      "项目名是什么版本"
+    ],
+    "tool_messages": [
+      {"role": "tool", "content": "{\"content\": \"MTCA (Multi-Tier Context Architecture) is a long-term memory middleware.\", \"version\": \"v0.4\"}"}
+    ],
+    "assistant_messages": [
+      "读取 README.md 第一段如下 MTCA Multi-Tier Context Architecture is a long-term memory middleware",
+      "项目名 MTCA 当前版本 v0.4 维护者是 nitace666"
+    ],
+    "expected_recall_query": "README 项目名",
+    "expected_top_segment": "test_049"
+  },
+  {
+    "id": "test_050",
+    "topic": "工具调用 - 计时提醒",
+    "user_messages": [
+      "10 分钟后提醒我站起来活动",
+      "好的 等会提醒"
+    ],
+    "tool_messages": [
+      {"role": "tool", "content": "{\"timer_id\": \"t_8821\", \"expires_at\": \"2026-07-05T15:30:00Z\"}"}
+    ],
+    "assistant_messages": [
+      "已创建计时器 ID t_8821 10 分钟后触发",
+      "10 分钟后会通知你起来活动 长时间坐着不利于健康"
+    ],
+    "expected_recall_query": "计时 提醒",
+    "expected_top_segment": "test_050"
+  }
+]
