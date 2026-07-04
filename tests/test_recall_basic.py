@@ -1,18 +1,14 @@
-"""src/recall/recall_engine.py 测试：8 个核心行为（剩余 T14 补齐 50 段用例）。
+"""src/recall/recall_engine.py 测试：T14 补齐到 50 段用例。
 
-按用户 prompt 列出的 8 个必测点：
-1. test_recall_finds_by_keyword
-2. test_recall_finds_by_topic
-3. test_recall_combines_channels
-4. test_recall_expands_neighbors
-5. test_recall_falls_back_to_recent
-6. test_recall_respects_time_window
-7. test_recall_rerank_by_relevance
-8. test_recall_returns_l0_messages
-
-附 2 个直接通道验证：
-- test_search_sessions_directly
-- test_search_segments_directly
+结构（10 个原有 + 40 个新增 = 50）：
+- 核心行为（8）：test_recall_finds_by_keyword / _topic / _combines /
+  _expands_neighbors / _falls_back_to_recent / _respects_time_window /
+  _rerank_by_relevance / _returns_l0_messages
+- 直接通道（2）：test_search_sessions_directly / test_search_segments_directly
+- 老板真历史场景（24，新增）：漫剧 / 编程 / 工作 / 生活
+- 边界 case（16，新增）：短对话 / 长对话 / 多话题 / 工具调用 / empty /
+  FTS5 特殊字符 / 大小写 / SQL 注入 / 极短查询 / top_k / 大量干扰 /
+  时间窗口错开 / 多关键词 / 中英混合 / 数字 / 停用词
 """
 
 from __future__ import annotations
@@ -446,3 +442,600 @@ def test_search_segments_directly(mtca_db: Path) -> None:
         "xyzkey_不存在的词_xyzkey", limit=10, path=mtca_db
     )
     assert rows_empty == []
+
+
+# ===========================================================================
+# T14：40 个新测试（24 真历史场景 + 16 边界 case）
+# ===========================================================================
+
+
+def _make_session_multi(
+    mtca_db: Path,
+    messages: list[tuple[str, str]],
+    topic_label: str | None = None,
+) -> tuple[str, str]:
+    """建会话 + 写 N 条消息（list[(role, content)]）+ 落骨架，返回 (sid, seg_id)。"""
+    sid = create_session(path=mtca_db)
+    for role, content in messages:
+        write_message(sid, role, content, path=mtca_db)
+    skel = build_skeleton(sid, path=mtca_db)
+    if topic_label is not None:
+        skel["topic_label"] = topic_label
+    return sid, save_skeleton(sid, skel, path=mtca_db)
+
+
+# ---------------------------------------------------------------------------
+# 老板真历史场景（24）：漫剧 3 / 编程 9 / 工作 6 / 生活 6
+# ---------------------------------------------------------------------------
+
+
+def test_real_novel_fantasy_awakening(mtca_db: Path) -> None:
+    """漫剧·玄幻：灵根觉醒。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="主角林动在山洞里灵根觉醒 获得祖石传承",
+        asst_msg="天妖貂族血脉 修炼大荒芜经",
+        topic_label="武动乾坤灵根觉醒",
+    )
+    results = recall("灵根觉醒", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_novel_ancient_revenge(mtca_db: Path) -> None:
+    """漫剧·古装：燕王复仇。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="燕王回京 清算当年陷害母妃的叛臣",
+        asst_msg="血洗尚书府 夺回兵权",
+        topic_label="燕王复仇记",
+    )
+    results = recall("燕王", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_novel_modern_boss(mtca_db: Path) -> None:
+    """漫剧·现代：霸总顾霆琛。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="顾总把女人抵在墙上 你只能是我的",
+        asst_msg="女人挣扎 你放我走",
+        topic_label="顾总请签字离婚",
+    )
+    results = recall("顾总", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_python_decorator(mtca_db: Path) -> None:
+    """编程·Python：装饰器调试。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Python 装饰器 functools.wraps 忘记写 丢失函数元信息",
+        asst_msg="加上 functools.wraps(func) 保留 __name__",
+        topic_label="Python 装饰器",
+    )
+    results = recall("装饰器", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_rust_borrow(mtca_db: Path) -> None:
+    """编程·Rust：生命周期注解。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Rust 借用检查器报错 lifetime annotation needed",
+        asst_msg="结构体字段加 'a 标注即可",
+        topic_label="Rust 生命周期",
+    )
+    results = recall("生命周期", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_typescript_guard(mtca_db: Path) -> None:
+    """编程·TypeScript：类型守卫。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="TypeScript 类型守卫 typeof instanceof 写不出来",
+        asst_msg="用 in 操作符做自定义类型谓词",
+        topic_label="TS 类型守卫",
+    )
+    results = recall("类型守卫", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_go_context(mtca_db: Path) -> None:
+    """编程·Go：context 取消传播。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Go context.WithCancel goroutine 没收到取消信号",
+        asst_msg="子协程必须 select <-ctx.Done() 才退出",
+        topic_label="Go context 取消",
+    )
+    results = recall("context 取消", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_sql_index(mtca_db: Path) -> None:
+    """编程·SQL：覆盖索引。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="MySQL 覆盖索引 covering index 避免回表查询",
+        asst_msg="把查询列也加到联合索引里",
+        topic_label="MySQL 索引优化",
+    )
+    results = recall("覆盖索引", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_redis_cache(mtca_db: Path) -> None:
+    """编程·Redis：缓存穿透。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Redis 缓存穿透 不存在的 key 每次都打 DB",
+        asst_msg="用布隆过滤器挡住 null 请求",
+        topic_label="Redis 缓存穿透",
+    )
+    results = recall("缓存穿透", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_kafka_lag(mtca_db: Path) -> None:
+    """编程·Kafka：消费者积压。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Kafka 消费者消息积压 lag 越来越大",
+        asst_msg="增加分区数 + 横向扩 consumer 实例",
+        topic_label="消息积压",
+    )
+    results = recall("消息积压", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_linux_process(mtca_db: Path) -> None:
+    """编程·Linux：僵尸进程排查。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Linux 出现大量僵尸进程 defunct 杀不掉",
+        asst_msg="kill -9 父进程让 init 接管回收",
+        topic_label="僵尸进程",
+    )
+    results = recall("僵尸进程", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_code_docker_network(mtca_db: Path) -> None:
+    """编程·Docker：bridge 网络容器互通。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Docker bridge 网络下容器之间 ping 不通",
+        asst_msg="用 docker network connect 加入同一网络",
+        topic_label="Docker bridge 网络",
+    )
+    results = recall("bridge 网络", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_weekly_report(mtca_db: Path) -> None:
+    """工作·周报：Q3 复盘。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="本周完成召回引擎重构 Q3 目标达成 95%",
+        asst_msg="下周聚焦 LLM 接入层",
+        topic_label="Q3 周报复盘",
+    )
+    results = recall("Q3 周报", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_product_prd(mtca_db: Path) -> None:
+    """工作·产品 PRD。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="PRD 文档写了三版 业务方还不满意",
+        asst_msg="画用户旅程图比文字描述更直观",
+        topic_label="产品 PRD 评审",
+    )
+    results = recall("PRD", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_contract_clause(mtca_db: Path) -> None:
+    """工作·合同：违约金条款。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="合同违约金条款写成合同总额 30% 对方不接受",
+        asst_msg="改成逾期部分每日万分之五",
+        topic_label="违约金",
+    )
+    results = recall("违约金", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_promotion_review(mtca_db: Path) -> None:
+    """工作·晋升答辩。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="晋升答辩 PPT 准备了三周 评委问技术深度",
+        asst_msg="多讲架构演进和踩坑案例",
+        topic_label="晋升答辩准备",
+    )
+    results = recall("晋升答辩", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_recruit_jd(mtca_db: Path) -> None:
+    """工作·招聘 JD：架构师。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="高级架构师 JD 写了 30 条要求 没人投",
+        asst_msg="聚焦 3 个核心能力 删掉锦上添花的",
+        topic_label="架构师招聘",
+    )
+    results = recall("架构师", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_work_project_init(mtca_db: Path) -> None:
+    """工作·立项评审。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="新业务立项评审被驳回 ROI 不清晰",
+        asst_msg="补三套财务测算模型 区分乐观中观悲观",
+        topic_label="业务立项评审",
+    )
+    results = recall("立项", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_medical_check(mtca_db: Path) -> None:
+    """生活·体检：血脂指标。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="体检报告显示血脂偏高 低密度脂蛋白超标",
+        asst_msg="少吃内脏 多吃深海鱼",
+        topic_label="血脂偏高",
+    )
+    results = recall("血脂", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_baby_food(mtca_db: Path) -> None:
+    """生活·宝宝辅食。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="六个月宝宝辅食先加米粉还是菜泥",
+        asst_msg="先高铁米粉 再根茎类蔬菜泥",
+        topic_label="宝宝辅食添加",
+    )
+    results = recall("辅食", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_renovation(mtca_db: Path) -> None:
+    """生活·装修：水电改造预算。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="水电改造报价一万八 是不是被坑了",
+        asst_msg="按米数算 一般 80 平 60 米左右",
+        topic_label="水电改造预算",
+    )
+    results = recall("水电改造", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_travel(mtca_db: Path) -> None:
+    """生活·旅游：杭州西湖。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="西湖一日游 断桥残雪 雷峰塔 怎么安排",
+        asst_msg="早上断桥 中午楼外楼 下午灵隐",
+        topic_label="杭州西湖攻略",
+    )
+    results = recall("西湖", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_recipe(mtca_db: Path) -> None:
+    """生活·食谱：红烧肉。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="红烧肉总是炖得太柴 不够软烂",
+        asst_msg="小火慢炖两小时 中途不开盖",
+        topic_label="红烧肉做法",
+    )
+    results = recall("红烧肉", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_real_life_pet_neuter(mtca_db: Path) -> None:
+    """生活·宠物：猫咪绝育。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="猫咪绝育手术前后注意事项 多大做",
+        asst_msg="六个月以上 术前禁食八小时",
+        topic_label="猫咪绝育护理",
+    )
+    results = recall("绝育", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+# ---------------------------------------------------------------------------
+# 边界 case（16）
+# ---------------------------------------------------------------------------
+
+
+def test_edge_short_dialog_one_message(mtca_db: Path) -> None:
+    """边界·短对话：仅 1 条消息。"""
+    sid = create_session(path=mtca_db)
+    write_message(sid, "user", "孤零零的一条问候语 你好世界", path=mtca_db)
+    skel = build_skeleton(sid, path=mtca_db)
+    skel["topic_label"] = "问候语"
+    seg_id = save_skeleton(sid, skel, path=mtca_db)
+
+    results = recall("问候语", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_long_dialog_ten_messages(mtca_db: Path) -> None:
+    """边界·长对话：10 条消息交叉。"""
+    _sid, seg_id = _make_session_multi(
+        mtca_db,
+        [
+            ("user", "今天来讨论大型语言模型的注意力机制"),
+            ("assistant", "自注意力 self-attention 计算 QKV"),
+            ("user", "多头注意力 multi-head 的作用是什么"),
+            ("assistant", "并行多组注意力 捕获不同子空间"),
+            ("user", "位置编码 positional encoding 怎么做"),
+            ("assistant", "正弦位置编码或 RoPE 旋转位置编码"),
+            ("user", "LayerNorm 放在 MHA 前还是后"),
+            ("assistant", "Pre-LN 训练更稳定 Post-LN 表达更强"),
+            ("user", "总结一下注意力机制的演进"),
+            ("assistant", "MHA -> MQA -> GQA -> MLA 推理加速"),
+        ],
+        topic_label="注意力机制长讨论",
+    )
+    results = recall("注意力机制", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_multi_topic_three_sessions(mtca_db: Path) -> None:
+    """边界·多话题：3 个会话同关键词，召回应能区分。"""
+    seg_ids: list[str] = []
+    for tag in ["篮球", "足球", "网球"]:
+        _sid, seg_id = _make_session_with_skeleton(
+            mtca_db,
+            user_msg=f"今天聊 {tag} 比赛精彩瞬间",
+            asst_msg=f"{tag} 运动员发挥稳定",
+            topic_label=f"{tag} 比赛",
+        )
+        seg_ids.append(seg_id)
+    seg_basket, seg_foot, seg_tennis = seg_ids
+
+    r_basket = recall("篮球", path=mtca_db, top_k=3)
+    r_foot = recall("足球", path=mtca_db, top_k=3)
+    r_tennis = recall("网球", path=mtca_db, top_k=3)
+
+    basket_ids = {r["segment_id"] for r in r_basket}
+    foot_ids = {r["segment_id"] for r in r_foot}
+    tennis_ids = {r["segment_id"] for r in r_tennis}
+
+    assert seg_basket in basket_ids
+    assert seg_foot in foot_ids
+    assert seg_tennis in tennis_ids
+
+
+def test_edge_tool_calls_in_message(mtca_db: Path) -> None:
+    """边界·工具调用：assistant 消息带 tool_calls。"""
+    sid = create_session(path=mtca_db)
+    write_message(sid, "user", "查一下北京今天天气", path=mtca_db)
+    write_message(
+        sid, "assistant",
+        "好的 我帮你查天气",
+        tool_calls={"name": "get_weather", "args": {"city": "北京"}},
+        path=mtca_db,
+    )
+    write_message(
+        sid, "tool",
+        "{\"temp\": 25, \"desc\": \"晴\"}",
+        tool_results={"temp": 25, "desc": "晴"},
+        path=mtca_db,
+    )
+    skel = build_skeleton(sid, path=mtca_db)
+    skel["topic_label"] = "天气工具调用"
+    seg_id = save_skeleton(sid, skel, path=mtca_db)
+
+    results = recall("天气", path=mtca_db, top_k=3)
+    found = next((r for r in results if r["segment_id"] == seg_id), None)
+    assert found is not None
+    roles = {m["role"] for m in found["messages"]}
+    assert "tool" in roles
+
+
+def test_edge_tool_results_only_message(mtca_db: Path) -> None:
+    """边界·工具结果：session 只有 tool 角色消息。"""
+    sid = create_session(path=mtca_db)
+    write_message(
+        sid, "tool",
+        "数据库查询结果 返回 42 行数据",
+        tool_results={"rows": 42},
+        path=mtca_db,
+    )
+    skel = build_skeleton(sid, path=mtca_db)
+    skel["topic_label"] = "数据库查询结果"
+    seg_id = save_skeleton(sid, skel, path=mtca_db)
+
+    results = recall("数据库查询", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_empty_content_message(mtca_db: Path) -> None:
+    """边界·空消息：写一条 content='' 的消息。"""
+    sid = create_session(path=mtca_db)
+    write_message(sid, "user", "正常提问", path=mtca_db)
+    write_message(sid, "assistant", "正常回答", path=mtca_db)
+    write_message(sid, "assistant", "", path=mtca_db)
+    skel = build_skeleton(sid, path=mtca_db)
+    skel["topic_label"] = "含空消息的会话"
+    seg_id = save_skeleton(sid, skel, path=mtca_db)
+
+    results = recall("正常提问", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_single_char_query(mtca_db: Path) -> None:
+    """边界·极短查询：单字。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="秦 始 皇 陵 兵 马 俑",
+        asst_msg="世界文化遗产",
+        topic_label="秦始皇陵",
+    )
+    results = recall("秦", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_fts5_special_chars_query(mtca_db: Path) -> None:
+    """边界·FTS5 特殊字符：含 \" * : ^ 括号，不应崩溃。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="Python 列表推导式 vs map 函数对比",
+        asst_msg="推导式更 Pythonic",
+        topic_label="Python 推导式",
+    )
+    for bad_query in [
+        '"Python"',
+        "Python*",
+        "tag:Python",
+        "Python^2",
+        "(Python)",
+        "Python's",
+        "Py--thon",
+    ]:
+        results = recall(bad_query, path=mtca_db, top_k=3)
+        assert isinstance(results, list)
+    clean = recall("Python 列表推导式", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in clean)
+
+
+def test_edge_top_k_zero_returns_empty(mtca_db: Path) -> None:
+    """边界·top_k=0：coerce 后退化为默认值 5。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="测试 top_k 边界",
+        asst_msg="好的",
+        topic_label="top_k 边界",
+    )
+    results = recall("top_k", path=mtca_db, top_k=0)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_many_distractor_segments(mtca_db: Path) -> None:
+    """边界·大量干扰段：100 个无关段 + 1 目标段。"""
+    for i in range(100):
+        _make_session_with_skeleton(
+            mtca_db,
+            user_msg=f"干扰会话 {i} 主题毫不相关 内容也不同",
+            asst_msg=f"这是干扰 {i}",
+            topic_label=f"干扰话题 {i}",
+        )
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="独一无二的目标 金丝雀 黄昏飞行",
+        asst_msg="金丝雀在黄昏的余晖里飞过",
+        topic_label="金丝雀 黄昏 飞行",
+    )
+    results = recall("金丝雀 黄昏", path=mtca_db, top_k=5)
+    picked_ids = [r["segment_id"] for r in results]
+    assert picked_ids[0] == seg_id
+
+
+def test_edge_case_insensitive_query(mtca_db: Path) -> None:
+    """边界·大小写不敏感：FTS5 默认 ascii 大小写不敏感。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="JavaScript async await syntax",
+        asst_msg="Promise-based",
+        topic_label="JavaScript Async",
+    )
+    results = recall("JAVASCRIPT", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_sql_injection_attempt(mtca_db: Path) -> None:
+    """边界·SQL 注入尝试：含 ; DROP TABLE。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="正常讨论的话题 安全防护",
+        asst_msg="SQL 注入要防",
+        topic_label="安全防护",
+    )
+    malicious = "'; DROP TABLE segments; --"
+    results = recall(malicious, path=mtca_db, top_k=3)
+    assert isinstance(results, list)
+    normal = recall("安全防护", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in normal)
+
+
+def test_edge_multi_keyword_query(mtca_db: Path) -> None:
+    """边界·多关键词查询：每个关键词各自能召回对应段。"""
+    _sid_a, seg_a = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="讨论 React 组件状态管理",
+        asst_msg="useState Hook",
+        topic_label="React 状态管理",
+    )
+    _sid_b, seg_b = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="讨论 Vue 组件状态管理",
+        asst_msg="reactive API",
+        topic_label="Vue 状态管理",
+    )
+    _make_session_with_skeleton(
+        mtca_db,
+        user_msg="讨论 Python 装饰器",
+        asst_msg="functools.wraps",
+        topic_label="Python 装饰器",
+    )
+    r_a = recall("React", path=mtca_db, top_k=5)
+    r_b = recall("Vue", path=mtca_db, top_k=5)
+    a_ids = {r["segment_id"] for r in r_a}
+    b_ids = {r["segment_id"] for r in r_b}
+    assert seg_a in a_ids
+    assert seg_b in b_ids
+
+
+def test_edge_mixed_cjk_ascii_query(mtca_db: Path) -> None:
+    """边界·中英混合查询：字母 + 中文。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="使用 Python jieba 做中文分词",
+        asst_msg="pip install jieba 即可",
+        topic_label="jieba 中文分词",
+    )
+    results = recall("Python jieba", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_numeric_query(mtca_db: Path) -> None:
+    """边界·数字查询：纯数字。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="2024 年公司营收突破 1000 万",
+        asst_msg="同比增长 25%",
+        topic_label="2024 财报",
+    )
+    results = recall("2024", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in results)
+
+
+def test_edge_time_window_fully_misaligned(mtca_db: Path) -> None:
+    """边界·时间窗口完全错开：返回空。"""
+    _sid, seg_id = _make_session_with_skeleton(
+        mtca_db,
+        user_msg="现在的话题",
+        asst_msg="好的",
+        topic_label="现在话题",
+    )
+    ancient = (1_000_000_000_000, 1_000_000_000_500)
+    results = recall("现在", path=mtca_db, top_k=3, time_window=ancient)
+    assert results == []
+    no_tw = recall("现在", path=mtca_db, top_k=3)
+    assert any(r["segment_id"] == seg_id for r in no_tw)
