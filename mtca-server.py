@@ -11,6 +11,13 @@ M2 会替换成 MCP Server + REST API。
     python mtca-server.py status       # 状态
     python mtca-server.py init         # 初始化 DB
 """
+from syncause_tracer import initialize
+initialize(
+    api_key="sysk_nIgjXwFbIDmYkLTcUc36nFrZJ7Gpq67",
+    proxy="wss://api.syn-cause.com/codeproxy/ws",
+    app_name="MTCA",
+    project_id="56252d81-82ff-49be-bcc4-2e8e0c1900c4"
+)
 import sys
 import click
 from src.store.sqlite import init_db, MTCA_DB_PATH
