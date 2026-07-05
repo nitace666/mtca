@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 MTCA Server 启动入口（M1 阶段占位）
 
@@ -11,13 +11,17 @@ M2 会替换成 MCP Server + REST API。
     python mtca-server.py status       # 状态
     python mtca-server.py init         # 初始化 DB
 """
-from syncause_tracer import initialize
-initialize(
-    api_key="sysk_nIgjXwFbIDmYkLTcUc36nFrZJ7Gpq67",
-    proxy="wss://api.syn-cause.com/codeproxy/ws",
-    app_name="MTCA",
-    project_id="56252d81-82ff-49be-bcc4-2e8e0c1900c4"
-)
+import os
+# 可选埋点：仅当 MTCA_TRACE=1 + 3 个凭证齐全时才启用
+# 默认不安装 syncause_tracer；用户想启用自行 pip install syncause-tracer
+if os.environ.get("MTCA_TRACE") == "1":
+    from syncause_tracer import initialize
+    initialize(
+        api_key=os.environ["SYNCAUSE_API_KEY"],
+        proxy=os.environ["SYNCAUSE_PROXY"],
+        app_name="MTCA",
+        project_id=os.environ["SYNCAUSE_PROJECT_ID"],
+    )
 import sys
 import click
 from src.store.sqlite import init_db, MTCA_DB_PATH
