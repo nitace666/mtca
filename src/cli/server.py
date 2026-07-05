@@ -1,7 +1,7 @@
 ﻿'''MTCA Server 启动入口（src/cli/server.py — T_A2 模块化）
 
 从根目录 mtca-server.py 迁移而来；保持原 CLI 子命令 + 默认行为不变。
-pyproject.toml [project.scripts] 已指向 src.cli.server:main。
+pyproject.toml [project.scripts] 指向 cli.server:main。
 '''
 import os
 
@@ -17,7 +17,10 @@ if os.environ.get('MTCA_TRACE') == '1':
     )
 
 import click
-from src.store.sqlite import MTCA_DB_PATH, get_stats, init_db
+try:
+    from src.store.sqlite import MTCA_DB_PATH, get_stats, init_db
+except ImportError:
+    from store.sqlite import MTCA_DB_PATH, get_stats, init_db
 
 
 @click.group()

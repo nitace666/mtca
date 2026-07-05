@@ -32,8 +32,8 @@ dev = [
 ]
 
 [project.scripts]
-mtca-server = "src.cli.server:main"
-mtca = "src.cli.timeline:main"
+mtca-server = "cli.server:main"
+mtca = "cli.timeline:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

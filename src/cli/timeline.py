@@ -36,8 +36,14 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.tree import Tree
 
-from src.recall.recall_engine import search_segments
-from src.store.sqlite import query
+try:
+    from src.recall.recall_engine import search_segments
+except ImportError:
+    from recall.recall_engine import search_segments
+try:
+    from src.store.sqlite import query
+except ImportError:
+    from store.sqlite import query
 
 
 # ---------------------------------------------------------------------------

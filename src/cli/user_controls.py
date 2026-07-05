@@ -25,10 +25,22 @@ from typing import Optional, Union
 
 import click
 
-from src.compress.scoring import archive as _archive
-from src.compress.scoring import mark_cycle as _mark_cycle
-from src.compress.scoring import mark_important as _mark_important
-from src.fog.fog_engine import fog_segment as _fog_segment
+try:
+    from src.compress.scoring import archive as _archive
+except ImportError:
+    from compress.scoring import archive as _archive
+try:
+    from src.compress.scoring import mark_cycle as _mark_cycle
+except ImportError:
+    from compress.scoring import mark_cycle as _mark_cycle
+try:
+    from src.compress.scoring import mark_important as _mark_important
+except ImportError:
+    from compress.scoring import mark_important as _mark_important
+try:
+    from src.fog.fog_engine import fog_segment as _fog_segment
+except ImportError:
+    from fog.fog_engine import fog_segment as _fog_segment
 
 
 # ---------------------------------------------------------------------------
