@@ -118,6 +118,38 @@ def _parse_facts_from_text(llm_text: str) -> list[dict]:
     return []
 
 
+def _extract_fact_text(item: dict) -> str:
+    """从 LLM 返回的 fact dict 里提取 fact 文本。
+
+    支持 3 种 LLM schema:
+    - 标准：{"content": "..."} 或 {"fact": "..."} 或 {"text": "..."}
+    - RDF 三元组：{"subject": "...", "predicate": "...", "object": "..."}
+      可选 {"time": "..."} → "subject predicate object（time）"
+    """
+    # 1. 直接文本字段
+    direct = (
+        item.get("content")
+        or item.get("fact")
+        or item.get("text")
+    )
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+
+    # 2. RDF 三元组（qwen-heretic 等 fine-tune 模型会输出）
+    subj = item.get("subject")
+    pred = item.get("predicate")
+    obj = item.get("object")
+    if isinstance(subj, str) and isinstance(pred, str) and isinstance(obj, str):
+        if subj.strip() and pred.strip() and obj.strip():
+            triple = f"{subj.strip()} {pred.strip()} {obj.strip()}"
+            time = item.get("time")
+            if isinstance(time, str) and time.strip():
+                triple += f"（{time.strip()}）"
+            return triple
+
+    return ""
+
+
 def _coerce_facts(data: Any) -> list[dict]:
     """把 JSON parse 结果规整为 list[dict{content, confidence, tags}]。
 
@@ -133,8 +165,8 @@ def _coerce_facts(data: Any) -> list[dict]:
     for item in data:
         if not isinstance(item, dict):
             continue
-        content = item.get("content")
-        if not isinstance(content, str) or not content.strip():
+        content = _extract_fact_text(item)
+        if not content:
             continue
         try:
             conf = float(item.get("confidence", _DEFAULT_CONFIDENCE))
