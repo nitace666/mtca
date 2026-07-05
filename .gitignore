@@ -227,3 +227,6 @@ tests/_tmp_ground_truth/
 
 probes/
 
+# Seed script (maintainer-only; regenerate ground truth on demand)
+benchmarks/_seed_test_set.py
+

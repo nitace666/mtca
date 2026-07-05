@@ -16,7 +16,7 @@
     ],
     "expected_recall_query": "Python 装饰器 wraps",
     "expected_top_segment": "test_001",
-    "expected_top1": "810f4d1a-b967-472e-a416-9c3d382b93a9"
+    "expected_top1": "e29aa506-eae0-4875-b067-3d8d6ed64972"
   },
   {
     "id": "test_002",
@@ -35,7 +35,7 @@
     ],
     "expected_recall_query": "Rust 生命周期 注解",
     "expected_top_segment": "test_002",
-    "expected_top1": "3b1f85be-b24d-4a6f-9a6a-bbf77032087a"
+    "expected_top1": "b76a967f-c1ab-4318-827b-8416b6b250de"
   },
   {
     "id": "test_003",
@@ -52,7 +52,7 @@
     ],
     "expected_recall_query": "TypeScript 类型守卫",
     "expected_top_segment": "test_003",
-    "expected_top1": "e5da2a7c-fbf7-489a-94e2-9da49c464e30"
+    "expected_top1": "37290f1f-84fc-48e3-b64f-c1feb89f31e3"
   },
   {
     "id": "test_004",
@@ -71,7 +71,7 @@
     ],
     "expected_recall_query": "Go context 取消",
     "expected_top_segment": "test_004",
-    "expected_top1": "fdad134a-cb4f-4104-a90e-7ef279066e51"
+    "expected_top1": "a8f9a9ad-617f-44bb-a0ca-83790f31b19c"
   },
   {
     "id": "test_005",
@@ -90,7 +90,7 @@
     ],
     "expected_recall_query": "MySQL 覆盖索引",
     "expected_top_segment": "test_005",
-    "expected_top1": "e8673542-6df5-48c3-809f-6af86920a679"
+    "expected_top1": "7db39e18-3328-4fce-987c-64f333419e5b"
   },
   {
     "id": "test_006",
@@ -109,7 +109,7 @@
     ],
     "expected_recall_query": "Redis 缓存穿透",
     "expected_top_segment": "test_006",
-    "expected_top1": "aea80640-cf6e-4d10-9980-5d11ca54dfe3"
+    "expected_top1": "04f9182a-2cf3-40b3-9651-933a6cae98d2"
   },
   {
     "id": "test_007",
@@ -128,7 +128,7 @@
     ],
     "expected_recall_query": "Kafka 消息积压",
     "expected_top_segment": "test_007",
-    "expected_top1": "fa9d47d4-d875-4222-b5b7-23882aa70135"
+    "expected_top1": "1a5c4218-316c-4047-9647-a60f02d78765"
   },
   {
     "id": "test_008",
@@ -147,7 +147,7 @@
     ],
     "expected_recall_query": "Linux 僵尸进程",
     "expected_top_segment": "test_008",
-    "expected_top1": "67f3fc53-f055-4600-85c9-016bccc71c82"
+    "expected_top1": "e9d0d06e-4bba-45f7-bf86-927eecf8405a"
   },
   {
     "id": "test_009",
@@ -166,7 +166,7 @@
     ],
     "expected_recall_query": "Docker bridge 网络",
     "expected_top_segment": "test_009",
-    "expected_top1": "187f1663-f0b6-4e52-b7e8-faa09e0ade6b"
+    "expected_top1": "c41c2100-5bac-4469-9cf2-933191ffe3e7"
   },
   {
     "id": "test_010",
@@ -185,7 +185,7 @@
     ],
     "expected_recall_query": "Q3 周报 复盘",
     "expected_top_segment": "test_010",
-    "expected_top1": "4dbc2b1d-4b8a-4668-a160-ef87e7c1cf74"
+    "expected_top1": "1e6299a1-c769-4f92-ad98-31c991aa6d74"
   },
   {
     "id": "test_011",
@@ -204,7 +204,7 @@
     ],
     "expected_recall_query": "产品 PRD 评审",
     "expected_top_segment": "test_011",
-    "expected_top1": "89a81c6a-dd26-4362-aa0f-528ffe7c8532"
+    "expected_top1": "92d645dc-4730-4c3b-a894-7d6cdc6f10bb"
   },
   {
     "id": "test_012",
@@ -223,7 +223,7 @@
     ],
     "expected_recall_query": "合同 违约金",
     "expected_top_segment": "test_012",
-    "expected_top1": "d401fcd4-c5b0-47ee-a566-bae7c36a1c11"
+    "expected_top1": "6ae619d7-e2ef-40bb-a79c-4b2288ea2574"
   },
   {
     "id": "test_013",
@@ -242,7 +242,7 @@
     ],
     "expected_recall_query": "晋升 答辩 准备",
     "expected_top_segment": "test_013",
-    "expected_top1": "da5f0835-aefe-44cf-b62d-fdcad5bf50e6"
+    "expected_top1": "5624e2f3-6798-44ea-88dd-eb092a50cfbe"
   },
   {
     "id": "test_014",
@@ -261,7 +261,7 @@
     ],
     "expected_recall_query": "架构师 招聘 JD",
     "expected_top_segment": "test_014",
-    "expected_top1": "e51498cc-d535-4ca7-a068-684f66e3f942"
+    "expected_top1": "30df8e81-97af-44f3-96c4-ba311d31bad3"
   },
   {
     "id": "test_015",
@@ -280,7 +280,7 @@
     ],
     "expected_recall_query": "业务 立项 评审",
     "expected_top_segment": "test_015",
-    "expected_top1": "66442b57-e657-433d-8284-9fae301fff85"
+    "expected_top1": "e06193df-eb3d-4044-aad2-b7b640eafc57"
   },
   {
     "id": "test_016",
@@ -299,7 +299,7 @@
     ],
     "expected_recall_query": "跨部门 协作",
     "expected_top_segment": "test_016",
-    "expected_top1": "abcc08cf-5449-4af5-aed8-a3b512977866"
+    "expected_top1": "5d5600d1-3e9c-4cbc-b2f4-a10605ef254b"
   },
   {
     "id": "test_017",
@@ -318,7 +318,7 @@
     ],
     "expected_recall_query": "血脂 体检 偏高",
     "expected_top_segment": "test_017",
-    "expected_top1": "43fc43ea-b2b2-44d6-8c47-cbcfcbde3c22"
+    "expected_top1": "9a18e7bb-57c9-4fb7-9e9d-019723f450a7"
   },
   {
     "id": "test_018",
@@ -337,7 +337,7 @@
     ],
     "expected_recall_query": "宝宝 辅食 添加",
     "expected_top_segment": "test_018",
-    "expected_top1": "6cfd5374-f446-449c-92ba-9c25b14c6a6b"
+    "expected_top1": "a886c5e9-12dd-4647-b376-00944d27d135"
   },
   {
     "id": "test_019",
@@ -356,7 +356,7 @@
     ],
     "expected_recall_query": "水电 改造 预算",
     "expected_top_segment": "test_019",
-    "expected_top1": "0d7b7f82-0096-4d3d-b6ca-485301f2f578"
+    "expected_top1": "13f5f712-c69b-45b6-ba24-3a563fa16364"
   },
   {
     "id": "test_020",
@@ -375,7 +375,7 @@
     ],
     "expected_recall_query": "西湖 一日游",
     "expected_top_segment": "test_020",
-    "expected_top1": "fad35d80-da78-48db-9be6-e7c5a38ef94f"
+    "expected_top1": "fbd5bca4-b948-4642-a19e-96001902d4a1"
   },
   {
     "id": "test_021",
@@ -394,7 +394,7 @@
     ],
     "expected_recall_query": "红烧肉 做法",
     "expected_top_segment": "test_021",
-    "expected_top1": "b614d30c-2d61-4cf7-84e6-7b6c8744c335"
+    "expected_top1": "ac6d3239-0756-439c-b54c-7d4ea3247ee0"
   },
   {
     "id": "test_022",
@@ -413,7 +413,7 @@
     ],
     "expected_recall_query": "猫咪 绝育",
     "expected_top_segment": "test_022",
-    "expected_top1": "ce123225-2535-4cd6-ab47-cae25c652b5a"
+    "expected_top1": "6e609388-f2c4-4db3-a71b-acf5532f26d9"
   },
   {
     "id": "test_023",
@@ -432,7 +432,7 @@
     ],
     "expected_recall_query": "健身 减脂 计划",
     "expected_top_segment": "test_023",
-    "expected_top1": "bf0c7e62-5a43-4d6a-8dca-c13488992091"
+    "expected_top1": "14ff8fe3-117b-46a5-8d32-62650d956596"
   },
   {
     "id": "test_024",
@@ -451,7 +451,7 @@
     ],
     "expected_recall_query": "英语单词 记忆",
     "expected_top_segment": "test_024",
-    "expected_top1": "fefb8cb1-9059-49a8-9bed-3d35aec3dd8e"
+    "expected_top1": "fa534b15-f245-4aa4-be2c-150101c8498a"
   },
   {
     "id": "test_025",
@@ -470,7 +470,7 @@
     ],
     "expected_recall_query": "PMP 备考",
     "expected_top_segment": "test_025",
-    "expected_top1": "212d3281-39f8-407c-bbc3-0c7d42f7198b"
+    "expected_top1": "a4aa78cf-be00-4a1e-a898-f29cae282986"
   },
   {
     "id": "test_026",
@@ -489,7 +489,7 @@
     ],
     "expected_recall_query": "深度学习 课程 笔记",
     "expected_top_segment": "test_026",
-    "expected_top1": "0c7baa0a-0d2c-4cbb-b984-ede038561f32"
+    "expected_top1": "a06f61f4-6d10-4a1a-b5f7-a24144185dba"
   },
   {
     "id": "test_027",
@@ -508,7 +508,7 @@
     ],
     "expected_recall_query": "资治通鉴 阅读 笔记",
     "expected_top_segment": "test_027",
-    "expected_top1": "27ea67f2-4234-4ff0-99d3-4633f541c2be"
+    "expected_top1": "9664c7bc-ff9d-4cd2-93ef-952cc66f2504"
   },
   {
     "id": "test_028",
@@ -527,7 +527,7 @@
     ],
     "expected_recall_query": "高考 数学 复习",
     "expected_top_segment": "test_028",
-    "expected_top1": "f0c5be81-b385-4a03-bf2d-19a26068fdd5"
+    "expected_top1": "95ff7718-adae-41c4-ab02-8a20a851043d"
   },
   {
     "id": "test_029",
@@ -546,7 +546,7 @@
     ],
     "expected_recall_query": "钢琴 练习 方法",
     "expected_top_segment": "test_029",
-    "expected_top1": "500d323c-38ef-4838-91e8-22a777c7758b"
+    "expected_top1": "a63fa736-6a57-4acd-8c33-fa70927236e6"
   },
   {
     "id": "test_030",
@@ -565,7 +565,7 @@
     ],
     "expected_recall_query": "雅思 口语 备考",
     "expected_top_segment": "test_030",
-    "expected_top1": "fc0953c7-9ddf-4b27-889e-8284e7e8b3fb"
+    "expected_top1": "d91cf25e-23b1-44c4-9e55-a1f7c26624a6"
   },
   {
     "id": "test_031",
@@ -580,7 +580,7 @@
     ],
     "expected_recall_query": "问候",
     "expected_top_segment": "test_031",
-    "expected_top1": "9128f848-0a48-4f84-a7e9-4406e38c3d16"
+    "expected_top1": "eb2e5a07-b120-442b-96df-6f153a8f2afd"
   },
   {
     "id": "test_032",
@@ -595,7 +595,7 @@
     ],
     "expected_recall_query": "Docker compose",
     "expected_top_segment": "test_032",
-    "expected_top1": "e0cd02be-32ae-4321-96e9-5a599249e737"
+    "expected_top1": "872cac6a-152b-4017-a7f4-deed2b7f70b5"
   },
   {
     "id": "test_033",
@@ -612,7 +612,7 @@
     ],
     "expected_recall_query": "PYTHONPATH",
     "expected_top_segment": "test_033",
-    "expected_top1": "bf797ff8-a529-4960-806c-312b8cc35dc5"
+    "expected_top1": "15077140-5f0b-4880-b9a4-6d75f3ae6c27"
   },
   {
     "id": "test_034",
@@ -627,7 +627,7 @@
     ],
     "expected_recall_query": "Visa 卡",
     "expected_top_segment": "test_034",
-    "expected_top1": "48504bf0-f9d7-4173-896f-b6657c966446"
+    "expected_top1": "4d5f7f02-31a1-4263-a6ee-faff3816729a"
   },
   {
     "id": "test_035",
@@ -642,7 +642,7 @@
     ],
     "expected_recall_query": "list tuple 区别",
     "expected_top_segment": "test_035",
-    "expected_top1": "903f26d6-d05a-4e7e-9ca4-89371b910f72"
+    "expected_top1": "1566468a-e848-416f-8382-c5202c2becbf"
   },
   {
     "id": "test_036",
@@ -673,7 +673,7 @@
     ],
     "expected_recall_query": "注意力机制 大模型",
     "expected_top_segment": "test_036",
-    "expected_top1": "945b93a3-d51d-4390-b36d-ce8657e01543"
+    "expected_top1": "87a87e2a-d36c-4c05-9542-e816fcf5ec56"
   },
   {
     "id": "test_037",
@@ -704,7 +704,7 @@
     ],
     "expected_recall_query": "装修 预算 细节",
     "expected_top_segment": "test_037",
-    "expected_top1": "394811a3-1a30-443d-9828-b085a55eb8f0"
+    "expected_top1": "e550b1fc-16b2-4304-b3f8-30f61d93001e"
   },
   {
     "id": "test_038",
@@ -735,7 +735,7 @@
     ],
     "expected_recall_query": "家庭 理财 配置",
     "expected_top_segment": "test_038",
-    "expected_top1": "057b3c70-7d0f-43c4-9812-5f073aaa4474"
+    "expected_top1": "b3fd3155-3fd7-428a-83ed-02b75e18b89f"
   },
   {
     "id": "test_039",
@@ -766,7 +766,7 @@
     ],
     "expected_recall_query": "小说 构思 科幻 记忆",
     "expected_top_segment": "test_039",
-    "expected_top1": "1fa3f630-6b65-499d-8d25-b774f17871f5"
+    "expected_top1": "b864ef87-d6a4-4350-9a1f-cc4f827b178c"
   },
   {
     "id": "test_040",
@@ -797,7 +797,7 @@
     ],
     "expected_recall_query": "英语 学习 规划 雅思",
     "expected_top_segment": "test_040",
-    "expected_top1": "32e80a98-8049-4d9d-9732-9d5f0822dccc"
+    "expected_top1": "fd29d949-2da0-4576-850f-3d63b746b6e9"
   },
   {
     "id": "test_041",
@@ -814,7 +814,7 @@
     ],
     "expected_recall_query": "篮球 足球 网球 比赛",
     "expected_top_segment": "test_041",
-    "expected_top1": "1a8c8370-6168-4f93-b2de-01e46bd9bd9b"
+    "expected_top1": "9b4c4b75-aaa9-4b10-9c85-f768b77d63ed"
   },
   {
     "id": "test_042",
@@ -831,7 +831,7 @@
     ],
     "expected_recall_query": "苹果 华为 小米 手机",
     "expected_top_segment": "test_042",
-    "expected_top1": "5fea511e-587d-44d5-99bd-7d35823fb953"
+    "expected_top1": "d8bb486b-7a36-48e9-9f57-3792b3334096"
   },
   {
     "id": "test_043",
@@ -848,7 +848,7 @@
     ],
     "expected_recall_query": "美式 拿铁 卡布 咖啡",
     "expected_top_segment": "test_043",
-    "expected_top1": "56624756-88e4-4cd5-ba8f-cca6268aed52"
+    "expected_top1": "6346ccdd-1f84-44f4-8925-dfdb4d596593"
   },
   {
     "id": "test_044",
@@ -865,7 +865,7 @@
     ],
     "expected_recall_query": "火锅 烧烤 日料",
     "expected_top_segment": "test_044",
-    "expected_top1": "dda563af-d495-4d60-8523-10d7b89143d3"
+    "expected_top1": "0e1d142b-8c11-495e-9efb-5b89b27b2c44"
   },
   {
     "id": "test_045",
@@ -882,7 +882,7 @@
     ],
     "expected_recall_query": "摇滚 民谣 爵士 音乐",
     "expected_top_segment": "test_045",
-    "expected_top1": "71ccdf1e-989a-4a5a-924f-a2615a4be6b2"
+    "expected_top1": "673ea306-25b7-4376-a417-cfe47a18ac46"
   },
   {
     "id": "test_046",
@@ -897,7 +897,7 @@
     ],
     "expected_recall_query": "北京 天气",
     "expected_top_segment": "test_046",
-    "expected_top1": "1e703bda-f848-496b-ab60-b09b032a8995"
+    "expected_top1": "24ed3a16-f424-41cb-baa8-3e4c229008b8"
   },
   {
     "id": "test_047",
@@ -912,7 +912,7 @@
     ],
     "expected_recall_query": "订单 统计 数据库",
     "expected_top_segment": "test_047",
-    "expected_top1": "ff2073f9-fbd7-4c33-be26-3bd991b86fd5"
+    "expected_top1": "4a72e533-31fc-43c1-982d-b64a17dd0b64"
   },
   {
     "id": "test_048",
@@ -927,7 +927,7 @@
     ],
     "expected_recall_query": "翻译 中英",
     "expected_top_segment": "test_048",
-    "expected_top1": "ac720403-12ab-4635-9680-0078188c54cf"
+    "expected_top1": "2d61da19-bf8a-42d2-b856-a78aab1e8d6d"
   },
   {
     "id": "test_049",
@@ -942,7 +942,7 @@
     ],
     "expected_recall_query": "README 项目名",
     "expected_top_segment": "test_049",
-    "expected_top1": "faea5b4a-cb0b-43e3-96c2-d50990b775b1"
+    "expected_top1": "03a27c19-8072-4f12-9274-e65dc2ce2de5"
   },
   {
     "id": "test_050",
@@ -957,6 +957,6 @@
     ],
     "expected_recall_query": "计时 提醒",
     "expected_top_segment": "test_050",
-    "expected_top1": "c0fecaa0-3bc7-4b94-ab51-6698cd7e83cb"
+    "expected_top1": "42fb8d78-474f-41bd-9550-ff131bbd8c79"
   }
 ]

@@ -209,6 +209,61 @@ CREATE TABLE IF NOT EXISTS score_events (
 CREATE INDEX IF NOT EXISTS idx_score_events_segment
     ON score_events(segment_id, created_at);
 
+-- 表 7: settings（C1 配置持久化：DB 优先，TOML 备份）
+CREATE TABLE IF NOT EXISTS settings (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+
+-- 表 8: facts（C1 LLM 提炼的事实，可变；非 L0）
+CREATE TABLE IF NOT EXISTS facts (
+    fact_id     TEXT PRIMARY KEY,
+    session_id  TEXT NOT NULL,
+    segment_id  TEXT,
+    content     TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'extracted',
+    confidence  REAL DEFAULT 1.0,
+    tags        TEXT,
+    created_at  INTEGER NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+    FOREIGN KEY (segment_id) REFERENCES segments(segment_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_facts_session ON facts(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_facts_segment ON facts(segment_id);
+
+-- facts FTS5（轻量级全文搜索，给 recall 用）
+CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(
+    content,
+    content='facts',
+    content_rowid='rowid',
+    tokenize='unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS facts_fts_ai
+AFTER INSERT ON facts
+BEGIN
+    INSERT INTO facts_fts(rowid, content) VALUES (new.rowid, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_fts_ad
+AFTER DELETE ON facts
+BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, content)
+    VALUES('delete', old.rowid, old.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS facts_fts_au
+AFTER UPDATE ON facts
+BEGIN
+    INSERT INTO facts_fts(facts_fts, rowid, content)
+    VALUES('delete', old.rowid, old.content);
+    INSERT INTO facts_fts(rowid, content) VALUES (new.rowid, new.content);
+END;
+
 -- 表 6: fog_session（雾化通道控制表，授权期间存在记录即放行 UPDATE）
 CREATE TABLE IF NOT EXISTS fog_session (
     session_id  TEXT,

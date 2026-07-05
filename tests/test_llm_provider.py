@@ -188,6 +188,45 @@ def test_lmstudio_embed(monkeypatch: pytest.MonkeyPatch) -> None:
     assert vec == [0.5, 0.5]
 
 
+def test_lmstudio_generate_disables_thinking_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LMStudioProvider default payload should disable thinking (Qwen3 reasoning model).
+
+    不显式传 enable_thinking 时，generate 请求应带
+    chat_template_kwargs={"enable_thinking": False}，避免 T29 C1 被 reasoning_content 拖垮。
+    """
+    captured = {}
+    def fake_post(url, *args, **kwargs):
+        captured["payload"] = kwargs.get("json", {})
+        return _mock_response(
+            200,
+            {"choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}]},
+        )
+    monkeypatch.setattr(httpx, "post", fake_post)
+    p = LMStudioProvider()
+    assert p.enable_thinking is False
+    p.generate("ping")
+    assert captured["payload"]["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_lmstudio_generate_can_opt_in_thinking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LMStudioProvider enable_thinking=True 时 payload 应开启 thinking。"""
+    captured = {}
+    def fake_post(url, *args, **kwargs):
+        captured["payload"] = kwargs.get("json", {})
+        return _mock_response(
+            200,
+            {"choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}}]},
+        )
+    monkeypatch.setattr(httpx, "post", fake_post)
+    p = LMStudioProvider(enable_thinking=True)
+    p.generate("ping")
+    assert captured["payload"]["chat_template_kwargs"] == {"enable_thinking": True}
+
+
 # ---------------------------------------------------------------------------
 # 测试 4：工厂 auto 探测
 # ---------------------------------------------------------------------------

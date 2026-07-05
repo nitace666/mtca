@@ -38,6 +38,11 @@ from typing import Any, Optional, Union
 from src.l0.skeleton import extract_keywords
 from src.l0.session_writer import get_session_messages
 from src.store.sqlite import query as db_query
+try:
+    from src.llm.facts_store import search_facts
+except ImportError:
+    def search_facts(*a, **kw):
+        return []
 
 # T28 防御性 LRU 缓存 (OrderedDict hashlib json)
 from collections import OrderedDict
@@ -493,6 +498,40 @@ def _coerce_score_value(value: Any) -> float:
 # ---------------------------------------------------------------------------
 
 
+def _search_facts_channel(query: str, top_k: int, path) -> list[dict]:
+    """C1.6: facts 通道全文搜索，返回标准化 dict 列表（带 is_fact=True）。
+
+    返回元素形如：
+        {
+            "is_fact": True,
+            "fact_id": ...,
+            "session_id": ...,
+            "segment_id": ...,
+            "content": ...,
+            "confidence": ...,
+            "source": "extracted",
+            "created_at": ...,
+        }
+    """
+    try:
+        rows = search_facts(query, top_k=top_k, path=path)
+    except Exception:
+        return []
+    out: list[dict] = []
+    for r in rows:
+        out.append({
+            "is_fact": True,
+            "fact_id": r.get("fact_id"),
+            "session_id": r.get("session_id"),
+            "segment_id": r.get("segment_id"),
+            "content": r.get("content"),
+            "confidence": r.get("confidence"),
+            "source": r.get("source"),
+            "created_at": r.get("created_at"),
+        })
+    return out
+
+
 def _messages_in_segment(
     session_id: str,
     start_seq: int,
@@ -566,6 +605,10 @@ def recall(
             merged.append(c)
 
     if not merged:
+        # L0 没命中：但 facts 通道仍可能命中（C1.6 双路改造）
+        fact_results = _search_facts_channel(query, safe_top_k, path=path)
+        if fact_results:
+            return list(fact_results)
         return []
 
     # 邻居展开（以合并后的段为中心）
@@ -607,6 +650,19 @@ def recall(
             "score": float(seg.get("score", 0.0)),
             "messages": msgs,
         })
+    # C1.6: facts 通道补充（即使 L0 没命中，facts 命中也要返回）
+    fact_results = _search_facts_channel(query, safe_top_k, path=path)
+    if fact_results:
+        # facts 排在最前（事实优先），去重按 fact_id
+        seen_fact_ids = set()
+        merged_facts = []
+        for f in fact_results:
+            fid = f.get("fact_id")
+            if fid and fid not in seen_fact_ids:
+                seen_fact_ids.add(fid)
+                merged_facts.append(f)
+        results = merged_facts + results
+
     _cache_put(cache_key, results)
     return results
 
