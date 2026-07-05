@@ -15,7 +15,8 @@
       "把装饰器从外到内逐层加 wraps 然后用 inspect.signature 检查最终签名"
     ],
     "expected_recall_query": "Python 装饰器 wraps",
-    "expected_top_segment": "test_001"
+    "expected_top_segment": "test_001",
+    "expected_top1": "810f4d1a-b967-472e-a416-9c3d382b93a9"
   },
   {
     "id": "test_002",
@@ -33,7 +34,8 @@
       "想 zero-copy 的话入参和返回都加 'a 标注即可 全链路用同一生命周期"
     ],
     "expected_recall_query": "Rust 生命周期 注解",
-    "expected_top_segment": "test_002"
+    "expected_top_segment": "test_002",
+    "expected_top1": "3b1f85be-b24d-4a6f-9a6a-bbf77032087a"
   },
   {
     "id": "test_003",
@@ -49,7 +51,8 @@
       "never 出现说明前面分支已经穷尽 推荐用 discriminated union + exhaustiveness check 让编译器帮你兜底"
     ],
     "expected_recall_query": "TypeScript 类型守卫",
-    "expected_top_segment": "test_003"
+    "expected_top_segment": "test_003",
+    "expected_top1": "e5da2a7c-fbf7-489a-94e2-9da49c464e30"
   },
   {
     "id": "test_004",
@@ -67,7 +70,8 @@
       "任何阻塞 select 都要至少有 ctx.Done 分支 这是 Go 并发的肌肉记忆"
     ],
     "expected_recall_query": "Go context 取消",
-    "expected_top_segment": "test_004"
+    "expected_top_segment": "test_004",
+    "expected_top1": "fdad134a-cb4f-4104-a90e-7ef279066e51"
   },
   {
     "id": "test_005",
@@ -85,7 +89,8 @@
       "覆盖索引的代价是写入放大和存储空间 业务写入频率高就要权衡 OLTP 场景慎用宽索引"
     ],
     "expected_recall_query": "MySQL 覆盖索引",
-    "expected_top_segment": "test_005"
+    "expected_top_segment": "test_005",
+    "expected_top1": "e8673542-6df5-48c3-809f-6af86920a679"
   },
   {
     "id": "test_006",
@@ -103,7 +108,8 @@
       "1000 万 key 用 1% 误判大概 12MB 内存 完全够 但过滤器重建是大工程 提前想好滚动方案"
     ],
     "expected_recall_query": "Redis 缓存穿透",
-    "expected_top_segment": "test_006"
+    "expected_top_segment": "test_006",
+    "expected_top1": "aea80640-cf6e-4d10-9980-5d11ca54dfe3"
   },
   {
     "id": "test_007",
@@ -121,7 +127,8 @@
       "高级方案是分区 key 打散 + 局部有序 业务上能容忍即可批量处理 3 提升 10 倍不是梦"
     ],
     "expected_recall_query": "Kafka 消息积压",
-    "expected_top_segment": "test_007"
+    "expected_top_segment": "test_007",
+    "expected_top1": "fa9d47d4-d875-4222-b5b7-23882aa70135"
   },
   {
     "id": "test_008",
@@ -139,7 +146,8 @@
       "代码层面 fork 完立即 waitpid 别留尾巴 或者用 double fork 让孙子进程被 init 收养"
     ],
     "expected_recall_query": "Linux 僵尸进程",
-    "expected_top_segment": "test_008"
+    "expected_top_segment": "test_008",
+    "expected_top1": "67f3fc53-f055-4600-85c9-016bccc71c82"
   },
   {
     "id": "test_009",
@@ -157,7 +165,8 @@
       "生产环境 compose 里 networks 显式声明 多 service 通信用 docker compose 自动编排 DNS 服务发现"
     ],
     "expected_recall_query": "Docker bridge 网络",
-    "expected_top_segment": "test_009"
+    "expected_top_segment": "test_009",
+    "expected_top1": "187f1663-f0b6-4e52-b7e8-faa09e0ade6b"
   },
   {
     "id": "test_010",
@@ -175,7 +184,8 @@
       "OKR 复盘要写在共享文档里 让 leader 知道你做了什么 不要只是自己看"
     ],
     "expected_recall_query": "Q3 周报 复盘",
-    "expected_top_segment": "test_010"
+    "expected_top_segment": "test_010",
+    "expected_top1": "4dbc2b1d-4b8a-4668-a160-ef87e7c1cf74"
   },
   {
     "id": "test_011",
@@ -193,7 +203,8 @@
       "PRD 评审 checklist 写给业务方看 包括功能边界 不做清单 反例比正例更说明问题"
     ],
     "expected_recall_query": "产品 PRD 评审",
-    "expected_top_segment": "test_011"
+    "expected_top_segment": "test_011",
+    "expected_top1": "89a81c6a-dd26-4362-aa0f-528ffe7c8532"
   },
   {
     "id": "test_012",
@@ -211,7 +222,8 @@
       "建议附加律师审阅条款 关键商业合同让法务过一遍 不要省这个时间"
     ],
     "expected_recall_query": "合同 违约金",
-    "expected_top_segment": "test_012"
+    "expected_top_segment": "test_012",
+    "expected_top1": "d401fcd4-c5b0-47ee-a566-bae7c36a1c11"
   },
   {
     "id": "test_013",
@@ -229,7 +241,8 @@
       "时间倒推练习 PPT 浓缩到 18 页 每页讲 1 分钟 留足 Q&A 时间"
     ],
     "expected_recall_query": "晋升 答辩 准备",
-    "expected_top_segment": "test_013"
+    "expected_top_segment": "test_013",
+    "expected_top1": "da5f0835-aefe-44cf-b62d-fdcad5bf50e6"
   },
   {
     "id": "test_014",
@@ -247,7 +260,8 @@
       "50 人团队在中国一般对应 P9+ 大厂总监级 招聘预算不在一个量级 要么降级要么加钱"
     ],
     "expected_recall_query": "架构师 招聘 JD",
-    "expected_top_segment": "test_014"
+    "expected_top_segment": "test_014",
+    "expected_top1": "e51498cc-d535-4ca7-a068-684f66e3f942"
   },
   {
     "id": "test_015",
@@ -265,7 +279,8 @@
       "悲观值场景下保持 IRR > 15% 才有立项可能 否则项目天然不过"
     ],
     "expected_recall_query": "业务 立项 评审",
-    "expected_top_segment": "test_015"
+    "expected_top_segment": "test_015",
+    "expected_top1": "66442b57-e657-433d-8284-9fae301fff85"
   },
   {
     "id": "test_016",
@@ -283,7 +298,8 @@
       "后续用 RACI 矩阵明确每个事项的 R A C I 谁负责 谁审批 谁咨询 谁知会"
     ],
     "expected_recall_query": "跨部门 协作",
-    "expected_top_segment": "test_016"
+    "expected_top_segment": "test_016",
+    "expected_top1": "abcc08cf-5449-4af5-aed8-a3b512977866"
   },
   {
     "id": "test_017",
@@ -301,7 +317,8 @@
       "忌口清单 动物内脏 油炸食品 肥肉 蛋黄每周不超 4 个 戒酒"
     ],
     "expected_recall_query": "血脂 体检 偏高",
-    "expected_top_segment": "test_017"
+    "expected_top_segment": "test_017",
+    "expected_top1": "43fc43ea-b2b2-44d6-8c47-cbcfcbde3c22"
   },
   {
     "id": "test_018",
@@ -319,7 +336,8 @@
       "橙色颗粒是正常现象 辅食初期宝宝消化能力有限 1-2 周会改善"
     ],
     "expected_recall_query": "宝宝 辅食 添加",
-    "expected_top_segment": "test_018"
+    "expected_top_segment": "test_018",
+    "expected_top1": "6cfd5374-f446-449c-92ba-9c25b14c6a6b"
   },
   {
     "id": "test_019",
@@ -337,7 +355,8 @@
       "联塑有 A 优 B 工程 C 家用 报价只写联塑没写系列就是模糊报价 让他明确写"
     ],
     "expected_recall_query": "水电 改造 预算",
-    "expected_top_segment": "test_019"
+    "expected_top_segment": "test_019",
+    "expected_top1": "0d7b7f82-0096-4d3d-b6ca-485301f2f578"
   },
   {
     "id": "test_020",
@@ -355,7 +374,8 @@
       "灵隐距离西湖 30 分钟车程 单独安排半天更充裕 早上 8 点出发"
     ],
     "expected_recall_query": "西湖 一日游",
-    "expected_top_segment": "test_020"
+    "expected_top_segment": "test_020",
+    "expected_top1": "fad35d80-da78-48db-9be6-e7c5a38ef94f"
   },
   {
     "id": "test_021",
@@ -373,7 +393,8 @@
       "不炒糖色可以用老抽上色 + 冰糖煮化 风味稍逊但操作简单零失败"
     ],
     "expected_recall_query": "红烧肉 做法",
-    "expected_top_segment": "test_021"
+    "expected_top_segment": "test_021",
+    "expected_top1": "b614d30c-2d61-4cf7-84e6-7b6c8744c335"
   },
   {
     "id": "test_022",
@@ -391,7 +412,8 @@
       "必须戴圈 母猫伤口感染会很麻烦 用软圈或者手术服替代 7-10 天"
     ],
     "expected_recall_query": "猫咪 绝育",
-    "expected_top_segment": "test_022"
+    "expected_top_segment": "test_022",
+    "expected_top1": "ce123225-2535-4cd6-ab47-cae25c652b5a"
   },
   {
     "id": "test_023",
@@ -409,7 +431,8 @@
       "蛋白质 1.6g/kg 体重 是减脂期推荐 1500 大卡够 但分配要 40% 蛋白 30% 脂肪 30% 碳水"
     ],
     "expected_recall_query": "健身 减脂 计划",
-    "expected_top_segment": "test_023"
+    "expected_top_segment": "test_023",
+    "expected_top1": "bf0c7e62-5a43-4d6a-8dca-c13488992091"
   },
   {
     "id": "test_024",
@@ -427,7 +450,8 @@
       "记忆黄金法 三遍法 早中晚各过一遍 第二天再过 不背诵而是自测"
     ],
     "expected_recall_query": "英语单词 记忆",
-    "expected_top_segment": "test_024"
+    "expected_top_segment": "test_024",
+    "expected_top1": "fefb8cb1-9059-49a8-9bed-3d35aec3dd8e"
   },
   {
     "id": "test_025",
@@ -445,7 +469,8 @@
       "5A 是参考 不是必须 3A 就能拿到证书 But 5A 写在简历上有亮点"
     ],
     "expected_recall_query": "PMP 备考",
-    "expected_top_segment": "test_025"
+    "expected_top_segment": "test_025",
+    "expected_top1": "212d3281-39f8-407c-bbc3-0c7d42f7198b"
   },
   {
     "id": "test_026",
@@ -463,7 +488,8 @@
       "BN 原始论文是激活函数前 现代实践 Pre-activation 效果更好 注意 ResNet 改进"
     ],
     "expected_recall_query": "深度学习 课程 笔记",
-    "expected_top_segment": "test_026"
+    "expected_top_segment": "test_026",
+    "expected_top1": "0c7baa0a-0d2c-4cbb-b984-ede038561f32"
   },
   {
     "id": "test_027",
@@ -481,7 +507,8 @@
       "商鞅死于秦 但秦用法家统一后 秦亡于法家过严 物极必反"
     ],
     "expected_recall_query": "资治通鉴 阅读 笔记",
-    "expected_top_segment": "test_027"
+    "expected_top_segment": "test_027",
+    "expected_top1": "27ea67f2-4234-4ff0-99d3-4633f541c2be"
   },
   {
     "id": "test_028",
@@ -499,7 +526,8 @@
       "概率题最后错很可能是组合数算错 或者互斥事件判断错 用穷举法验证"
     ],
     "expected_recall_query": "高考 数学 复习",
-    "expected_top_segment": "test_028"
+    "expected_top_segment": "test_028",
+    "expected_top1": "f0c5be81-b385-4a03-bf2d-19a26068fdd5"
   },
   {
     "id": "test_029",
@@ -517,7 +545,8 @@
       "必须分手慢练 + 节拍器从 60 起步 跟节拍器是肌肉和节奏同步的关键"
     ],
     "expected_recall_query": "钢琴 练习 方法",
-    "expected_top_segment": "test_029"
+    "expected_top_segment": "test_029",
+    "expected_top1": "500d323c-38ef-4838-91e8-22a777c7758b"
   },
   {
     "id": "test_030",
@@ -535,7 +564,8 @@
       "5 月 9 月换题季建议避开 或者考前一两个月再报名 等题库稳定"
     ],
     "expected_recall_query": "雅思 口语 备考",
-    "expected_top_segment": "test_030"
+    "expected_top_segment": "test_030",
+    "expected_top1": "fc0953c7-9ddf-4b27-889e-8284e7e8b3fb"
   },
   {
     "id": "test_031",
@@ -549,7 +579,8 @@
       "试试问技术问题 学习问题 或者聊聊生活 健康 都行"
     ],
     "expected_recall_query": "问候",
-    "expected_top_segment": "test_031"
+    "expected_top_segment": "test_031",
+    "expected_top1": "9128f848-0a48-4f84-a7e9-4406e38c3d16"
   },
   {
     "id": "test_032",
@@ -563,7 +594,8 @@
       "down 默认带 -v 才删除 volume 普通 down 保留 volume 数据"
     ],
     "expected_recall_query": "Docker compose",
-    "expected_top_segment": "test_032"
+    "expected_top_segment": "test_032",
+    "expected_top1": "e0cd02be-32ae-4321-96e9-5a599249e737"
   },
   {
     "id": "test_033",
@@ -579,7 +611,8 @@
       "写入 ~/.bashrc 或 .zshrc 然后 source 一下 全局生效"
     ],
     "expected_recall_query": "PYTHONPATH",
-    "expected_top_segment": "test_033"
+    "expected_top_segment": "test_033",
+    "expected_top1": "bf797ff8-a529-4960-806c-312b8cc35dc5"
   },
   {
     "id": "test_034",
@@ -593,7 +626,8 @@
       "招行流程简单 准备好身份证收入证明 10 个工作日内批卡"
     ],
     "expected_recall_query": "Visa 卡",
-    "expected_top_segment": "test_034"
+    "expected_top_segment": "test_034",
+    "expected_top1": "48504bf0-f9d7-4173-896f-b6657c966446"
   },
   {
     "id": "test_035",
@@ -607,7 +641,8 @@
       "纯查询无差别 大量元素时 tuple 实例化稍快 实际工程不敏感"
     ],
     "expected_recall_query": "list tuple 区别",
-    "expected_top_segment": "test_035"
+    "expected_top_segment": "test_035",
+    "expected_top1": "903f26d6-d05a-4e7e-9ca4-89371b910f72"
   },
   {
     "id": "test_036",
@@ -637,7 +672,8 @@
       "Mamba SSM 在长序列推理速度上超越 Transformer 但语言建模能力略逊 各有应用场景"
     ],
     "expected_recall_query": "注意力机制 大模型",
-    "expected_top_segment": "test_036"
+    "expected_top_segment": "test_036",
+    "expected_top1": "945b93a3-d51d-4390-b36d-ce8657e01543"
   },
   {
     "id": "test_037",
@@ -667,7 +703,8 @@
       "乳胶漆好打理 壁布质感好 看空间 大面积乳胶漆 局部壁布点睛"
     ],
     "expected_recall_query": "装修 预算 细节",
-    "expected_top_segment": "test_037"
+    "expected_top_segment": "test_037",
+    "expected_top1": "394811a3-1a30-443d-9828-b085a55eb8f0"
   },
   {
     "id": "test_038",
@@ -697,7 +734,8 @@
       "自住必买 投资慎重 一线仍可 三四线多套要卖 政策环境长期不利"
     ],
     "expected_recall_query": "家庭 理财 配置",
-    "expected_top_segment": "test_038"
+    "expected_top_segment": "test_038",
+    "expected_top1": "057b3c70-7d0f-43c4-9812-5f073aaa4474"
   },
   {
     "id": "test_039",
@@ -727,7 +765,8 @@
       "金句提升档次 影视化潜力大 改剧本可以在结尾用"
     ],
     "expected_recall_query": "小说 构思 科幻 记忆",
-    "expected_top_segment": "test_039"
+    "expected_top_segment": "test_039",
+    "expected_top1": "1fa3f630-6b65-499d-8d25-b774f17871f5"
   },
   {
     "id": "test_040",
@@ -757,7 +796,8 @@
       "口语题库命中率 95% 以上 必背题库 流利度比准确度重要"
     ],
     "expected_recall_query": "英语 学习 规划 雅思",
-    "expected_top_segment": "test_040"
+    "expected_top_segment": "test_040",
+    "expected_top1": "32e80a98-8049-4d9d-9732-9d5f0822dccc"
   },
   {
     "id": "test_041",
@@ -773,7 +813,8 @@
       "网球 大满贯抢七 运动员发挥稳定 Ace 球数量创纪录"
     ],
     "expected_recall_query": "篮球 足球 网球 比赛",
-    "expected_top_segment": "test_041"
+    "expected_top_segment": "test_041",
+    "expected_top1": "1a8c8370-6168-4f93-b2de-01e46bd9bd9b"
   },
   {
     "id": "test_042",
@@ -789,7 +830,8 @@
       "小米 15 Ultra 拍照能力顶级 徕卡镜头调色有特色 性价比突出"
     ],
     "expected_recall_query": "苹果 华为 小米 手机",
-    "expected_top_segment": "test_042"
+    "expected_top_segment": "test_042",
+    "expected_top1": "5fea511e-587d-44d5-99bd-7d35823fb953"
   },
   {
     "id": "test_043",
@@ -805,7 +847,8 @@
       "卡布奇诺 浓缩 30ml 牛奶 100ml 奶泡 100ml 奶泡厚度 1cm"
     ],
     "expected_recall_query": "美式 拿铁 卡布 咖啡",
-    "expected_top_segment": "test_043"
+    "expected_top_segment": "test_043",
+    "expected_top1": "56624756-88e4-4cd5-ba8f-cca6268aed52"
   },
   {
     "id": "test_044",
@@ -821,7 +864,8 @@
       "日料 三文鱼刺身 北极贝 各一盘 鳗鱼饭一份 天妇罗一份"
     ],
     "expected_recall_query": "火锅 烧烤 日料",
-    "expected_top_segment": "test_044"
+    "expected_top_segment": "test_044",
+    "expected_top1": "dda563af-d495-4d60-8523-10d7b89143d3"
   },
   {
     "id": "test_045",
@@ -837,7 +881,8 @@
       "爵士酒吧 演艺吧 Blue Note 即兴演奏 适合约会 品酒享受"
     ],
     "expected_recall_query": "摇滚 民谣 爵士 音乐",
-    "expected_top_segment": "test_045"
+    "expected_top_segment": "test_045",
+    "expected_top1": "71ccdf1e-989a-4a5a-924f-a2615a4be6b2"
   },
   {
     "id": "test_046",
@@ -846,15 +891,13 @@
       "查一下北京今天天气",
       "穿衣建议呢"
     ],
-    "tool_messages": [
-      {"role": "tool", "content": "{\"temp\": 25, \"desc\": \"晴\", \"humidity\": 35, \"wind\": \"3级\"}"}
-    ],
     "assistant_messages": [
       "我调用天气 API 给你查 北京今天 25 度 晴 湿度 35% 风力 3 级",
       "建议穿薄长袖加外套 早晚温差大 注意补水防晒"
     ],
     "expected_recall_query": "北京 天气",
-    "expected_top_segment": "test_046"
+    "expected_top_segment": "test_046",
+    "expected_top1": "1e703bda-f848-496b-ab60-b09b032a8995"
   },
   {
     "id": "test_047",
@@ -863,15 +906,13 @@
       "统计一下昨天订单总数",
       "客单价呢"
     ],
-    "tool_messages": [
-      {"role": "tool", "content": "{\"orders\": 1247, \"gmv\": 184523.5, \"avg_price\": 147.97}"}
-    ],
     "assistant_messages": [
       "查询 orders 表 where created_at = yesterday 昨天总订单 1247 单",
       "总 GMV 184,523 元 客单价 147.97 元 同比上升 8%"
     ],
     "expected_recall_query": "订单 统计 数据库",
-    "expected_top_segment": "test_047"
+    "expected_top_segment": "test_047",
+    "expected_top1": "ff2073f9-fbd7-4c33-be26-3bd991b86fd5"
   },
   {
     "id": "test_048",
@@ -880,15 +921,13 @@
       "翻译一下这句话 The early bird catches the worm",
       "反译回英文 看看地道吗"
     ],
-    "tool_messages": [
-      {"role": "tool", "content": "{\"translation\": \"早起的鸟儿有虫吃\", \"back_translation\": \"The early bird gets the worm\"}"}
-    ],
     "assistant_messages": [
       "调用翻译 API 返回 早起的鸟儿有虫吃 这是英语谚语 直译意译都可以",
       "反译回 The early bird gets the worm 比原句更地道 但语义一致"
     ],
     "expected_recall_query": "翻译 中英",
-    "expected_top_segment": "test_048"
+    "expected_top_segment": "test_048",
+    "expected_top1": "ac720403-12ab-4635-9680-0078188c54cf"
   },
   {
     "id": "test_049",
@@ -897,15 +936,13 @@
       "读一下 README.md 文件第一段",
       "项目名是什么版本"
     ],
-    "tool_messages": [
-      {"role": "tool", "content": "{\"content\": \"MTCA (Multi-Tier Context Architecture) is a long-term memory middleware.\", \"version\": \"v0.4\"}"}
-    ],
     "assistant_messages": [
       "读取 README.md 第一段如下 MTCA Multi-Tier Context Architecture is a long-term memory middleware",
       "项目名 MTCA 当前版本 v0.4 维护者是 nitace666"
     ],
     "expected_recall_query": "README 项目名",
-    "expected_top_segment": "test_049"
+    "expected_top_segment": "test_049",
+    "expected_top1": "faea5b4a-cb0b-43e3-96c2-d50990b775b1"
   },
   {
     "id": "test_050",
@@ -914,14 +951,12 @@
       "10 分钟后提醒我站起来活动",
       "好的 等会提醒"
     ],
-    "tool_messages": [
-      {"role": "tool", "content": "{\"timer_id\": \"t_8821\", \"expires_at\": \"2026-07-05T15:30:00Z\"}"}
-    ],
     "assistant_messages": [
       "已创建计时器 ID t_8821 10 分钟后触发",
       "10 分钟后会通知你起来活动 长时间坐着不利于健康"
     ],
     "expected_recall_query": "计时 提醒",
-    "expected_top_segment": "test_050"
+    "expected_top_segment": "test_050",
+    "expected_top1": "c0fecaa0-3bc7-4b94-ab51-6698cd7e83cb"
   }
 ]
