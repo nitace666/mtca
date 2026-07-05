@@ -97,6 +97,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "base_url": "http://localhost:1234",
         "model": "local-model",
         "timeout": _HTTP_GENERATE_TIMEOUT,
+        "enable_thinking": False,  # 默认关掉 Qwen3 thinking
     },
     "llamacpp": {
         "model_path": "~/models/qwen2.5-7b-instruct-q4_k_m.gguf",
@@ -376,6 +377,7 @@ class LMStudioProvider:
     base_url: str = "http://localhost:1234"
     model: str = "local-model"
     timeout: float = _HTTP_GENERATE_TIMEOUT
+    enable_thinking: bool = False  # 默认关掉 Qwen3 thinking（reasoning_content 会拖垮 content 输出）
 
     def __post_init__(self) -> None:
         self.base_url = self.base_url.rstrip("/")
@@ -388,6 +390,7 @@ class LMStudioProvider:
             "messages": [{"role": "user", "content": prompt}],
             "temperature": kwargs.get("temperature", _DEFAULT_TEMPERATURE),
             "stream": False,
+            "chat_template_kwargs": {"enable_thinking": self.enable_thinking},
         }
         if "max_tokens" in kwargs:
             payload["max_tokens"] = int(kwargs["max_tokens"])
@@ -710,6 +713,9 @@ def _build_lmstudio(cfg: dict[str, Any]) -> LMStudioProvider:
         model=_get(cfg, "lmstudio", "model", DEFAULT_CONFIG["lmstudio"]["model"]),
         timeout=float(
             _get(cfg, "lmstudio", "timeout", _HTTP_GENERATE_TIMEOUT)
+        ),
+        enable_thinking=bool(
+            _get(cfg, "lmstudio", "enable_thinking", DEFAULT_CONFIG["lmstudio"]["enable_thinking"])
         ),
     )
 

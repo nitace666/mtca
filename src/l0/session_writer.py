@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from src.store.sqlite import get_connection, query
+from src.llm.config_store import db_get_setting
 
 # ---------------------------------------------------------------------------
 # 常量与类型
@@ -70,6 +71,49 @@ def _serialize_json(value: Optional[Union[dict, list, str]]) -> Optional[str]:
         return json.dumps(value, ensure_ascii=False)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"无法序列化为 JSON：{exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Auto-extract hook (C1.5): write_message 后可选调 LLM 提炼事实
+# ---------------------------------------------------------------------------
+
+# settings 控制：
+# - extractor.auto_extract  True/False（默认 False）
+# - extractor.roles         逗号分隔，默认 "user,assistant"
+_HOOK_DEFAULT_ROLES: frozenset[str] = frozenset({"user", "assistant"})
+
+
+def _read_hook_setting(key: str, default: str, path=None) -> str:
+    v = db_get_setting(key, path=path)
+    return v if isinstance(v, str) else default
+
+
+def _is_hook_enabled(path=None) -> bool:
+    return _read_hook_setting("extractor.auto_extract", "False", path=path).lower() == "true"
+
+
+def _hook_roles(path=None) -> frozenset[str]:
+    raw = _read_hook_setting("extractor.roles", "user,assistant", path=path)
+    parts = frozenset(r.strip() for r in raw.split(",") if r.strip())
+    return parts if parts else _HOOK_DEFAULT_ROLES
+
+
+def _auto_extract_hook(session_id: str, role: str, content: str, path=None) -> None:
+    """write_message 提交后触发 LLM 提炼（fire-and-forget）。
+
+    失败不抛错（hook 不能阻塞主写入）。
+    """
+    if not _is_hook_enabled(path=path):
+        return
+    if not content or not content.strip():
+        return
+    if role not in _hook_roles(path=path):
+        return
+    try:
+        from src.llm.extractor import extract_and_store
+        extract_and_store(session_id=session_id, text=content, path=path)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +285,9 @@ def write_message(
             )
     except RuntimeError:
         raise
+
+    # C1.5 hook: 事务提交后触发自动提炼（失败不抛错）
+    _auto_extract_hook(session_id, role, content, path=path)
 
     return message_id
 
