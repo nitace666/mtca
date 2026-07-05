@@ -39,6 +39,11 @@ from src.l0.skeleton import extract_keywords
 from src.l0.session_writer import get_session_messages
 from src.store.sqlite import query as db_query
 
+# T28 防御性 LRU 缓存 (OrderedDict hashlib json)
+from collections import OrderedDict
+import hashlib
+import json
+
 # ---------------------------------------------------------------------------
 # 常量
 # ---------------------------------------------------------------------------
@@ -51,6 +56,34 @@ _DEFAULT_NEIGHBOR_WINDOW: int = 1
 
 # 默认回退会话数
 _FALLBACK_LIMIT: int = 10
+
+# T28 防御性 LRU 缓存
+_RECALL_CACHE_MAX = 128
+
+_RECALL_CACHE: "OrderedDict[str, list[dict]]" = OrderedDict()
+
+
+def _recall_cache_key(query, time_window, topics, top_k):
+    payload = json.dumps(
+        {"q": query, "tw": time_window, "to": topics or [], "k": top_k},
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.md5(payload.encode("utf-8")).hexdigest()
+
+
+def _cache_get(key):
+    if key in _RECALL_CACHE:
+        _RECALL_CACHE.move_to_end(key)
+        return _RECALL_CACHE[key]
+    return None
+
+
+def _cache_put(key, value):
+    if key in _RECALL_CACHE:
+        _RECALL_CACHE.move_to_end(key)
+    _RECALL_CACHE[key] = value
+    while len(_RECALL_CACHE) > _RECALL_CACHE_MAX:
+        _RECALL_CACHE.popitem(last=False)
 
 # L0 不可雾化字段（即便是 fogged_once 段，骨架字段仍可读）
 _FOGGED_OK_STATES: frozenset[str] = frozenset({"clear", "fogged_once", "archived"})
@@ -508,6 +541,12 @@ def recall(
     # 多召回一些邻居再 rerank；上限 ×4 防止邻居爆炸
     fetch_limit = safe_top_k * 4
 
+    # T28 LRU cache check
+    cache_key = _recall_cache_key(query, tw, topics, safe_top_k)
+    hit = _cache_get(cache_key)
+    if hit is not None:
+        return list(hit)
+
     cands_a = search_sessions(
         query=query, time_window=tw, topics=topics,
         limit=fetch_limit, path=path,
@@ -568,6 +607,7 @@ def recall(
             "score": float(seg.get("score", 0.0)),
             "messages": msgs,
         })
+    _cache_put(cache_key, results)
     return results
 
 
