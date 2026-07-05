@@ -1,19 +1,19 @@
-"""MTCA 主窗口（gui/main_window.py — T13）。
+"""MTCA 主窗口（gui/main_window.py — T13 / T25）。
 
-USER_CONTROLS.md §3.1 主界面：顶部工具栏 + 三栏（时间线 / 详情 / 操作）。
+USER_CONTROLS.md §3.1 主界面：顶部工具栏 + Tab 区域（时间线 / 详情 /
+知识图谱 / 操作）。
 
 设计要点：
-- 工具栏 4 个按钮：搜索 / 新建 / 刷新 / 设置。
-  - 搜索：弹 QInputDialog 输入关键词，走 ``recall_engine.search_segments``
-    回写左侧列表（不影响详情）。
-  - 新建：弹 QInputDialog 输入 topic_label，走 ``session_writer.create_session``
-    并尝试 ``segment_writer.write_segments``（有消息才生成段落）。
-  - 刷新：重拉段落列表。
-  - 设置：弹 QFileDialog 选 DB 文件，存到 ``self._db_path``。
-- 操作按钮 4 个：雾化 / 归档 / 重要 / 循环。
-  - 全部走 ``src.cli.user_controls`` 提供的 4 个 cmd_* 函数，保持
-    GUI 与 CLI 行为完全一致（USER_CONTROLS §2 + §3.3）。
-  - 雾化弹 ``FogDialog`` 强警告对话框。
+- 工具栏 4 个按钮：搜索 / 新建 / 刷新 / 设置（行为与原 T13 版一致）。
+- 中央 ``QTabWidget`` 4 个 Tab：
+  1. 时间线 ``TimelineView`` —— 左侧列表（T13）
+  2. 详情 ``SegmentDetail`` —— 段落元信息 + L0/L1/L2/L3（T13）
+  3. 知识图谱 ``GraphView`` —— 关系图谱视图（T25）
+  4. 操作 —— 4 个段落操作按钮（T13）
+- 操作按钮 4 个：雾化 / 归档 / 重要 / 循环，全部走
+  ``src.cli.user_controls`` 提供的 4 个 cmd_* 函数（USER_CONTROLS §2 +
+  §3.3），GUI 与 CLI 行为完全一致。
+- 知识图谱双击节点 → 切到「详情」Tab + 加载段落 + 同步右侧操作面板。
 - 不修改数据库结构；不开新文件；只组装 UI + 调用现有后端。
 """
 
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStatusBar,
+    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -45,6 +46,7 @@ from src.recall.recall_engine import search_segments
 from src.store.sqlite import MTCA_DB_PATH
 
 from gui.fog_dialog import FogDialog
+from gui.graph_view import GraphView
 from gui.segment_detail import SegmentDetail
 from gui.timeline_view import TimelineView
 
@@ -61,12 +63,18 @@ _CYCLE_TAGS: tuple[str, ...] = (
     "月初", "月末", "每天",
 )
 
+# Tab 索引常量（便于双击节点切到详情 Tab）
+_TAB_TIMELINE: int = 0
+_TAB_DETAIL: int = 1
+_TAB_GRAPH: int = 2
+_TAB_ACTIONS: int = 3
+
 
 class MainWindow(QMainWindow):
     """MTCA GUI 主窗口。"""
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        """初始化主窗口与三栏布局。"""
+        """初始化主窗口与 Tab 布局。"""
         super().__init__(parent)
         self.setWindowTitle("MTCA — 长期记忆中间件")
         self.resize(1280, 800)
@@ -106,27 +114,36 @@ class MainWindow(QMainWindow):
         toolbar.addAction(act_settings)
 
     def _build_central(self) -> None:
-        """中间三栏：左侧时间线 / 中间详情 / 右侧操作。"""
-        central = QWidget(self)
-        layout = QHBoxLayout(central)
-        layout.setContentsMargins(4, 4, 4, 4)
+        """中央 4 Tab：时间线 / 详情 / 知识图谱 / 操作。"""
+        self._tabs = QTabWidget()
+        self._tabs.setTabPosition(QTabWidget.TabPosition.North)
 
-        # ---- 左：时间线 ----
+        # ---- Tab 0：时间线 ----
         self._timeline = TimelineView()
         self._timeline.segment_selected.connect(self._on_segment_selected)
-        self._timeline.setMinimumWidth(320)
-        layout.addWidget(self._timeline, 3)
+        self._tabs.addTab(self._timeline, "时间线")
 
-        # ---- 中：详情 ----
+        # ---- Tab 1：详情 ----
         self._detail = SegmentDetail()
-        self._detail.setMinimumWidth(420)
-        layout.addWidget(self._detail, 5)
+        self._tabs.addTab(self._detail, "详情")
 
-        # ---- 右：操作按钮 ----
-        action_panel = QWidget()
-        action_layout = QVBoxLayout(action_panel)
-        action_layout.setContentsMargins(8, 8, 8, 8)
-        action_layout.addWidget(QLabel("段落操作"))
+        # ---- Tab 2：知识图谱 ----
+        self._graph = GraphView()
+        self._graph.segment_focus.connect(self._on_segment_focus)
+        self._tabs.addTab(self._graph, "知识图谱")
+
+        # ---- Tab 3：操作 ----
+        self._action_panel = self._build_action_panel()
+        self._tabs.addTab(self._action_panel, "操作")
+
+        self.setCentralWidget(self._tabs)
+
+    def _build_action_panel(self) -> QWidget:
+        """构造「操作」Tab 内的按钮面板。"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(QLabel("段落操作（先选择段落）"))
 
         self._btn_important = self._make_action_btn("/重要", self._on_important)
         self._btn_cycle = self._make_action_btn("/循环", self._on_cycle)
@@ -137,18 +154,17 @@ class MainWindow(QMainWindow):
             self._btn_important, self._btn_cycle,
             self._btn_archive, self._btn_fog,
         ):
-            action_layout.addWidget(btn)
-        action_layout.addStretch(1)
+            layout.addWidget(btn)
+        layout.addSpacing(8)
 
         self._action_status = QLabel("未选择段落")
         self._action_status.setWordWrap(True)
-        action_layout.addWidget(self._action_status)
+        layout.addWidget(self._action_status)
+        layout.addStretch(1)
 
-        action_panel.setMinimumWidth(160)
-        action_panel.setMaximumWidth(220)
-        layout.addWidget(action_panel, 1)
-
-        self.setCentralWidget(central)
+        # 初始禁用：未选段
+        self._set_action_buttons_enabled(False)
+        return panel
 
     def _build_statusbar(self) -> None:
         """底部状态栏：DB 路径 + 当前操作结果。"""
@@ -163,6 +179,17 @@ class MainWindow(QMainWindow):
         btn.setMinimumSize(_BTN_MIN_WIDTH, _BTN_MIN_HEIGHT)
         btn.clicked.connect(slot)
         return btn
+
+    # ------------------------------------------------------------------
+    # Tab 切换 / DB 同步
+    # ------------------------------------------------------------------
+
+    def _apply_db_path(self, db_path: Optional[Union[Path, str]]) -> None:
+        """把所有子控件的 DB 路径同步更新。"""
+        self._db_path = db_path
+        self._timeline.set_db_path(db_path)
+        self._detail.set_db_path(db_path)
+        self._graph.set_db_path(db_path)
 
     # ------------------------------------------------------------------
     # 工具栏回调
@@ -220,10 +247,11 @@ class MainWindow(QMainWindow):
         self._timeline.refresh()
 
     def _on_refresh(self) -> None:
-        """刷新：重拉左侧列表 + 当前段落详情。"""
+        """刷新：重拉时间线 + 当前段落详情 + 知识图谱。"""
         n = self._timeline.refresh()
         if self._current_seg_id:
             self._detail.show_segment(self._current_seg_id)
+        self._graph.refresh()
         self.statusBar().showMessage(f"已刷新，共 {n} 段", 3000)
 
     def _on_settings(self) -> None:
@@ -236,25 +264,46 @@ class MainWindow(QMainWindow):
         )
         if not path_str:
             return
-        self._db_path = path_str
-        self._timeline.set_db_path(self._db_path)
-        self._detail.set_db_path(self._db_path)
+        self._apply_db_path(path_str)
         self._db_label.setText(f"DB：{self._describe_db()}")
         self.statusBar().showMessage(f"DB 已切换：{path_str}", 5000)
         self._timeline.refresh()
+        self._graph.refresh()
 
     # ------------------------------------------------------------------
-    # 段落选中回调
+    # 段落选中回调（来自 TimelineView）
     # ------------------------------------------------------------------
 
     def _on_segment_selected(self, seg_id: str) -> None:
         """左侧选中段落后，加载详情 + 更新操作面板状态。"""
         self._current_seg_id = seg_id
         self._detail.show_segment(seg_id)
-        seg = get_segment(seg_id, path=self._db_path)
+        self._set_action_status_from_seg(seg_id)
+        self._set_action_buttons_enabled(True)
+
+    def _on_segment_focus(self, seg_id: str) -> None:
+        """知识图谱双击节点 → 切到详情 Tab + 加载段落。"""
+        self._current_seg_id = seg_id
+        self._detail.show_segment(seg_id)
+        self._set_action_status_from_seg(seg_id)
+        self._set_action_buttons_enabled(True)
+        # 切到详情 Tab
+        self._tabs.setCurrentIndex(_TAB_DETAIL)
+        self.statusBar().showMessage(
+            f"已跳转到段落详情：{seg_id}", 5000
+        )
+
+    def _set_action_status_from_seg(self, seg_id: str) -> None:
+        """按 seg_id 更新「操作」Tab 底部的状态文本。"""
+        if not seg_id:
+            self._action_status.setText("未选择段落")
+            return
+        try:
+            seg = get_segment(seg_id, path=self._db_path)
+        except (ValueError, RuntimeError):
+            seg = None
         topic = (seg or {}).get("topic_label") or "(无标题)"
         self._action_status.setText(f"当前段落：{topic}\nID：{seg_id}")
-        self._set_action_buttons_enabled(True)
 
     def _set_action_buttons_enabled(self, enabled: bool) -> None:
         """启用 / 禁用右侧 4 个操作按钮。"""
@@ -285,6 +334,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"已 /重要 {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
         self._detail.show_segment(seg_id)
+        self._graph.refresh()
 
     def _on_cycle(self) -> None:
         """/循环 X：选 cycle_tag。"""
@@ -304,6 +354,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"已 /循环 {tag} {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
         self._detail.show_segment(seg_id)
+        self._graph.refresh()
 
     def _on_archive(self) -> None:
         """/归档：tier → L3_hidden。"""
@@ -318,13 +369,17 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"已 /归档 {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
         self._detail.show_segment(seg_id)
+        self._graph.refresh()
 
     def _on_fog(self) -> None:
         """/雾化：弹 FogDialog 强警告对话框。"""
         seg_id = self._ensure_seg_id()
         if not seg_id:
             return
-        seg = get_segment(seg_id, path=self._db_path)
+        try:
+            seg = get_segment(seg_id, path=self._db_path)
+        except (ValueError, RuntimeError):
+            seg = None
         topic = (seg or {}).get("topic_label") or "(无标题)"
         dlg = FogDialog(parent=self, topic=topic, seg_id=seg_id)
         if dlg.exec() != FogDialog.DialogCode.Accepted:
@@ -341,6 +396,7 @@ class MainWindow(QMainWindow):
         )
         self._timeline.refresh()
         self._detail.show_segment(seg_id)
+        self._graph.refresh()
 
     # ------------------------------------------------------------------
     # 辅助
