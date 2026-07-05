@@ -1,6 +1,6 @@
-﻿"""tests/test_mtca_server.py — Stage A1 红绿测试。
+"""tests/test_mtca_server.py — Stage A1 红绿测试。
 
-验证 mtca-server.py 在没有 MTCA_TRACE=1 时不会调 syncause_tracer.initialize()。
+验证 src/cli/server.py 在没有 MTCA_TRACE=1 时不会调 syncause_tracer.initialize()。
 """
 import os
 import importlib
@@ -27,7 +27,7 @@ def test_no_env_means_no_initialize_call(monkeypatch):
         if "mtca_server" in sys.modules:
             del sys.modules["mtca_server"]
         spec = importlib.util.spec_from_file_location(
-            "mtca_server", "mtca-server.py"
+            "mtca_server", "src/cli/server.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
@@ -48,7 +48,7 @@ def test_with_env_calls_initialize(monkeypatch):
         if "mtca_server" in sys.modules:
             del sys.modules["mtca_server"]
         spec = importlib.util.spec_from_file_location(
-            "mtca_server", "mtca-server.py"
+            "mtca_server", "src/cli/server.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
