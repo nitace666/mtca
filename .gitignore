@@ -222,3 +222,6 @@ __marimo__/
 
 # MTCA local data (contains SQLite DB)
 .mtca/
+
+tests/_tmp_ground_truth/
+
