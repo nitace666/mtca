@@ -47,7 +47,7 @@ _UPDATABLE_FIELDS: frozenset[str] = frozenset({
     "current_tier", "current_score",
     "fog_state", "fog_at",
     "silence_state", "promoted_at", "ref_count",
-    "last_ask_at", "user_retention_days",
+    "last_ask_at", "user_retention_days", "long_silent",
     "superseded_by", "supersedes_count", "contradiction_level",
 })
 
@@ -76,7 +76,8 @@ def _coerce_value(col: str, value: Any) -> Any:
     if value is None:
         return None
     if col in ("end_msg_seq", "gap_to_next", "ref_count",
-               "supersedes_count", "user_retention_days"):
+               "supersedes_count", "user_retention_days",
+               "long_silent"):
         return int(value)
     if col in ("end_at", "fog_at", "last_ask_at", "promoted_at"):
         return int(value)

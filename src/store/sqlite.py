@@ -142,6 +142,7 @@ CREATE TABLE IF NOT EXISTS segments (
     ref_count            INTEGER DEFAULT 0,
     last_ask_at          INTEGER,
     user_retention_days  INTEGER,
+    long_silent          INTEGER DEFAULT 0,
     -- 矛盾检测字段（v0.4 新增）
     superseded_by        TEXT,
     supersedes_count     INTEGER DEFAULT 0,
