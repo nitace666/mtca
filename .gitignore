@@ -219,3 +219,6 @@ __marimo__/
 
 # Trae IDE
 .trae/
+
+# MTCA local data (contains SQLite DB)
+.mtca/
