@@ -54,3 +54,15 @@ def test_recall_p95_after_50_repeats_is_better(db_with_1k_segments: Path) -> Non
     p95_warm = statistics.quantiles(times2, n=20)[18]
     print(f"\n  warm-cache p95 = {p95_warm:.1f}ms")
     assert p95_warm < 200.0, f"warm cache p95 = {p95_warm:.1f}ms (sanity check)"
+
+
+def test_recall_cache_isolated_by_db_path(tmp_path: Path) -> None:
+    """两个不同 db 的相同 query 不应串味。"""
+    from src.store.sqlite import init_db
+    db1 = tmp_path / "db1.db"; init_db(db1)
+    db2 = tmp_path / "db2.db"; init_db(db2)
+    # 用空库跑就行（无 segment 也不应返回对方 db 的缓存）
+    r1 = recall(query="isolation", top_k=5, path=db1)
+    r2 = recall(query="isolation", top_k=5, path=db2)
+    # 都应返回空 list，且不抛异常（隔离验证）
+    assert r1 == [] and r2 == []

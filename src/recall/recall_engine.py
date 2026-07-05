@@ -63,9 +63,9 @@ _RECALL_CACHE_MAX = 128
 _RECALL_CACHE: "OrderedDict[str, list[dict]]" = OrderedDict()
 
 
-def _recall_cache_key(query, time_window, topics, top_k):
+def _recall_cache_key(query, time_window, topics, top_k, path):
     payload = json.dumps(
-        {"q": query, "tw": time_window, "to": topics or [], "k": top_k},
+        {"p": str(path) if path else "", "q": query, "tw": time_window, "to": topics or [], "k": top_k},
         sort_keys=True, ensure_ascii=False,
     )
     return hashlib.md5(payload.encode("utf-8")).hexdigest()
@@ -542,7 +542,7 @@ def recall(
     fetch_limit = safe_top_k * 4
 
     # T28 LRU cache check
-    cache_key = _recall_cache_key(query, tw, topics, safe_top_k)
+    cache_key = _recall_cache_key(query, tw, topics, safe_top_k, path)
     hit = _cache_get(cache_key)
     if hit is not None:
         return list(hit)
