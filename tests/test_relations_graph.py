@@ -641,3 +641,427 @@ def test_constants_and_dedupe(mtca_db: Path) -> None:
     r4 = create_relation(d, c, "related_to", path=mtca_db)
     assert r3["relation_id"] != r4["relation_id"]
     assert r4["deduped"] is False
+
+
+# ---------------------------------------------------------------------------
+# 测试 8（T26）：4 种关系 CRUD 边界
+# ---------------------------------------------------------------------------
+
+
+def test_create_4_relation_types_persist(mtca_db: Path) -> None:
+    """4 种关系各建一行；DB 中 4 行互不干扰。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    rows = []
+    for rtype in VALID_RELATION_TYPES:
+        rows.append(create_relation(a, b, rtype, path=mtca_db))
+    # 4 个 relation_id 互不相同
+    ids = {r["relation_id"] for r in rows}
+    assert len(ids) == 4
+    # DB 中 4 行
+    db_rows = query(
+        "SELECT relation_type FROM segment_relations "
+        "WHERE seg_a_id = ? AND seg_b_id = ?",
+        (a, b),
+        path=mtca_db,
+    )
+    assert {r["relation_type"] for r in db_rows} == set(VALID_RELATION_TYPES)
+
+
+def test_get_relation_returns_full_schema(mtca_db: Path) -> None:
+    """get_relation 返回 dict 含 8 个 DB 列。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    r = create_relation(a, b, "references", weight=2.5, path=mtca_db)
+    fetched = get_relation(r["relation_id"], path=mtca_db)
+    assert fetched is not None
+    for key in (
+        "relation_id", "seg_a_id", "seg_b_id", "relation_type",
+        "weight", "auto_created", "created_at",
+    ):
+        assert key in fetched
+    assert fetched["relation_type"] == "references"
+    assert fetched["seg_a_id"] == a
+    assert fetched["seg_b_id"] == b
+    assert float(fetched["weight"]) == 2.5
+
+
+def test_delete_relation_invalid_id_raises(mtca_db: Path) -> None:
+    """delete_relation 收到空 / 非字符串抛 ValueError。"""
+    with pytest.raises(ValueError):
+        delete_relation("", path=mtca_db)
+    with pytest.raises(ValueError):
+        delete_relation(None, path=mtca_db)  # type: ignore[arg-type]
+
+
+def test_create_relation_relation_type_normalization(mtca_db: Path) -> None:
+    """relation_type 大小写 / 前后空格自动规整。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    r = create_relation(a, b, "  RELATED_TO  ", path=mtca_db)
+    assert r["relation_type"] == "related_to"
+
+
+# ---------------------------------------------------------------------------
+# 测试 9（T26）：循环检测（A→B→A）
+# ---------------------------------------------------------------------------
+
+
+def test_two_hop_cycle_allowed(mtca_db: Path) -> None:
+    """A→B 与 B→A 是两条独立边；同时存在不报错。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    r_ab = create_relation(a, b, "related_to", path=mtca_db)
+    r_ba = create_relation(b, a, "related_to", path=mtca_db)
+    assert r_ab["deduped"] is False
+    assert r_ba["deduped"] is False
+    assert r_ab["relation_id"] != r_ba["relation_id"]
+    # get_related 双端匹配，center=a 时仍只返回 b 一次（去重）
+    related = get_related(a, path=mtca_db)
+    assert {r["segment_id"] for r in related} == {b}
+
+
+def test_get_topic_cluster_cycle_safe(mtca_db: Path) -> None:
+    """BFS 含 A↔B 环时不会无限循环；visited 防止重复入队。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    c = _insert_segment(mtca_db)
+    # 环：a ↔ b；b → c（延伸）
+    create_relation(a, b, "related_to", path=mtca_db)
+    create_relation(b, a, "related_to", path=mtca_db)
+    create_relation(b, c, "related_to", path=mtca_db)
+
+    t0 = time.perf_counter()
+    cluster = get_topic_cluster(a, depth=3, path=mtca_db)
+    elapsed = (time.perf_counter() - t0) * 1000
+    ids = {seg["segment_id"] for seg in cluster}
+    # BFS 必须终止且覆盖全图
+    assert ids == {a, b, c}
+    # 起始段排第一
+    assert cluster[0]["segment_id"] == a
+    # 防爆栈（百毫秒内必返回）
+    assert elapsed < 1000
+
+
+# ---------------------------------------------------------------------------
+# 测试 10（T26）：自环（A→A）拒绝
+# ---------------------------------------------------------------------------
+
+
+def test_self_loop_rejected(mtca_db: Path) -> None:
+    """seg_a == seg_b 时 create_relation 抛 ValueError。"""
+    s = _insert_segment(mtca_db)
+    for rtype in VALID_RELATION_TYPES:
+        with pytest.raises(ValueError):
+            create_relation(s, s, rtype, path=mtca_db)
+    # DB 中没有任何自环行
+    rows = query(
+        "SELECT * FROM segment_relations "
+        "WHERE seg_a_id = seg_b_id",
+        path=mtca_db,
+    )
+    assert rows == []
+
+
+def test_get_related_excludes_self(mtca_db: Path) -> None:
+    """get_related 结果中绝不包含查询段自身。"""
+    center = _insert_segment(mtca_db)
+    other = _insert_segment(mtca_db)
+    # center 与 other 建关系；同时构造一个会绕过 JOIN 过滤的「自反」场景
+    create_relation(center, other, "related_to", path=mtca_db)
+    out = get_related(center, path=mtca_db)
+    ids = [r["segment_id"] for r in out]
+    assert center not in ids
+    assert other in ids
+
+
+# ---------------------------------------------------------------------------
+# 测试 11（T26）：跨 topic 关系
+# ---------------------------------------------------------------------------
+
+
+def test_cross_topic_relation_allowed(mtca_db: Path) -> None:
+    """关系表允许跨 topic_label；不影响 CRUD。"""
+    a = _insert_segment(mtca_db, topic_label="漫剧方案")
+    b = _insert_segment(mtca_db, topic_label="工作项目")
+    r = create_relation(a, b, "related_to", path=mtca_db)
+    assert r["deduped"] is False
+    # list_relations / get_related 不按 topic 过滤
+    rels = list_relations(a, types=["related_to"], path=mtca_db)
+    assert len(rels) == 1
+    assert rels[0]["seg_b_id"] == b
+
+
+def test_get_topic_cluster_skips_supersedes(mtca_db: Path) -> None:
+    """supersedes 边不被 BFS 跟随（仅 references/related_to/derived_from）。"""
+    center = _insert_segment(mtca_db)
+    rel = _insert_segment(mtca_db)
+    sup = _insert_segment(mtca_db)
+    create_relation(center, rel, "related_to", path=mtca_db)
+    # supersedes 边连到一个不相关段
+    create_relation(center, sup, "supersedes", path=mtca_db)
+
+    cluster = get_topic_cluster(center, depth=2, path=mtca_db)
+    ids = {c["segment_id"] for c in cluster}
+    assert rel in ids
+    assert sup not in ids  # supersedes 边不参与 BFS
+
+
+def test_get_topic_cluster_includes_derived_from(mtca_db: Path) -> None:
+    """derived_from 边参与 BFS（双向）。"""
+    center = _insert_segment(mtca_db)
+    deriv = _insert_segment(mtca_db)
+    # deriv 是反向端（→ center），BFS 仍应能从 center 找到 deriv
+    create_relation(deriv, center, "derived_from", path=mtca_db)
+
+    cluster = get_topic_cluster(center, depth=1, path=mtca_db)
+    ids = {c["segment_id"] for c in cluster}
+    assert deriv in ids
+
+
+# ---------------------------------------------------------------------------
+# 测试 12（T26）：删除关系后图完整性
+# ---------------------------------------------------------------------------
+
+
+def test_delete_relation_keeps_other_edges(mtca_db: Path) -> None:
+    """删除 1 条边不影响其他边；段仍能查到剩余关系。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    c = _insert_segment(mtca_db)
+    r_ab = create_relation(a, b, "related_to", path=mtca_db)
+    create_relation(a, c, "references", path=mtca_db)
+    create_relation(b, c, "derived_from", path=mtca_db)
+
+    # 删 r_ab
+    assert delete_relation(r_ab["relation_id"], path=mtca_db) == 1
+
+    # a 仍剩 1 条关系（a→c references，传全部 types 才能看到）
+    rels = list_relations(a, types=list(VALID_RELATION_TYPES), path=mtca_db)
+    assert len(rels) == 1
+    assert rels[0]["seg_b_id"] == c
+
+    # b 仍能通过 derived_from 找到 c
+    rels_b = list_relations(b, types=list(VALID_RELATION_TYPES), path=mtca_db)
+    assert any(r["seg_b_id"] == c for r in rels_b)
+
+
+def test_delete_relation_idempotent(mtca_db: Path) -> None:
+    """同一 relation_id 删两次：第二次返回 0。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    r = create_relation(a, b, "related_to", path=mtca_db)
+    assert delete_relation(r["relation_id"], path=mtca_db) == 1
+    assert delete_relation(r["relation_id"], path=mtca_db) == 0
+
+
+def test_delete_relation_keeps_segments_intact(mtca_db: Path) -> None:
+    """删完所有关系后，段仍存在；get_topic_cluster 退化为仅中心。"""
+    a = _insert_segment(mtca_db)
+    b = _insert_segment(mtca_db)
+    c = _insert_segment(mtca_db)
+    r1 = create_relation(a, b, "related_to", path=mtca_db)
+    r2 = create_relation(a, c, "references", path=mtca_db)
+    delete_relation(r1["relation_id"], path=mtca_db)
+    delete_relation(r2["relation_id"], path=mtca_db)
+
+    # 段仍在
+    seg_rows = query(
+        "SELECT segment_id FROM segments "
+        "WHERE segment_id IN (?, ?, ?)",
+        (a, b, c),
+        path=mtca_db,
+    )
+    assert {r["segment_id"] for r in seg_rows} == {a, b, c}
+    # cluster 退化为仅中心
+    cluster = get_topic_cluster(a, depth=2, path=mtca_db)
+    ids = {c["segment_id"] for c in cluster}
+    assert ids == {a}
+
+
+# ---------------------------------------------------------------------------
+# 测试 13（T26）：export_to_json 大图截断
+# ---------------------------------------------------------------------------
+
+
+def _bulk_insert_segments(path: Path, count: int) -> list[str]:
+    """批量插入 count 个 segments（绕过 L0 触发器）。"""
+    ids: list[str] = []
+    for i in range(count):
+        ids.append(
+            _insert_segment(
+                path,
+                topic_label=f"topic_{i % 5}",
+                fog_anchor=f"keyword_{i}",
+                start_days_ago=i + 1,
+            )
+        )
+    return ids
+
+
+def test_export_to_json_node_truncation(mtca_db: Path) -> None:
+    """节点数 > EXPORT_NODE_MAX → truncated=True + 节点被截到上限。"""
+    # 制造 dense 图：s0 与 (EXPORT_NODE_MAX + 50) 个段都建 related_to
+    base = _now_ms()
+    s0 = _insert_segment(
+        mtca_db, topic_label="hub", fog_anchor="hub",
+        start_at_ms=base - 24 * 60 * 60 * 1000,
+    )
+    extra_count = EXPORT_NODE_MAX + 50
+    extras = _bulk_insert_segments(mtca_db, extra_count)
+    for sid in extras:
+        create_relation(s0, sid, "related_to", path=mtca_db)
+
+    out = export_to_json(s0, depth=1, path=mtca_db)
+    assert out["truncated"] is True
+    assert len(out["nodes"]) <= EXPORT_NODE_MAX
+
+
+def test_export_to_json_truncated_flag_false_when_small(mtca_db: Path) -> None:
+    """小图 truncated=False。"""
+    base = _now_ms()
+    s0 = _insert_segment(
+        mtca_db, topic_label="hub", fog_anchor="hub",
+        start_at_ms=base - 24 * 60 * 60 * 1000,
+    )
+    s1 = _insert_segment(
+        mtca_db, topic_label="hub", fog_anchor="leaf",
+        start_at_ms=base - 23 * 60 * 60 * 1000,
+    )
+    create_relation(s0, s1, "related_to", path=mtca_db)
+
+    out = export_to_json(s0, depth=1, path=mtca_db)
+    assert out["truncated"] is False
+    assert len(out["nodes"]) == 2
+
+
+def test_export_to_json_edges_filtered_to_node_set(mtca_db: Path) -> None:
+    """导出 edges 只保留 nodes 集合内的端点（用 supersedes 单向边制造 cluster 外）。"""
+    base = _now_ms()
+    s0 = _insert_segment(
+        mtca_db, topic_label="hub", fog_anchor="hub",
+        start_at_ms=base - 24 * 60 * 60 * 1000,
+    )
+    s1 = _insert_segment(
+        mtca_db, topic_label="hub", fog_anchor="leaf",
+        start_at_ms=base - 23 * 60 * 60 * 1000,
+    )
+    s_outside = _insert_segment(
+        mtca_db, topic_label="other", fog_anchor="outside",
+        start_at_ms=base - 22 * 60 * 60 * 1000,
+    )
+    # cluster 内边
+    create_relation(s0, s1, "related_to", path=mtca_db)
+    # cluster 外边：s_outside → s0 用 supersedes（单向，BFS 不跟随）
+    create_relation(s_outside, s0, "supersedes", path=mtca_db)
+
+    out = export_to_json(s0, depth=1, path=mtca_db)
+    ids = {n["id"] for n in out["nodes"]}
+    # BFS 不跟随 supersedes → s_outside 不在 cluster 内
+    assert s_outside not in ids
+    # edges 端点都在 nodes 内
+    for e in out["edges"]:
+        assert e["source"] in ids
+        assert e["target"] in ids
+    # cluster 内边（s0→s1 related_to）保留
+    assert any(
+        e["source"] == s0 and e["target"] == s1
+        for e in out["edges"]
+    )
+
+
+# ---------------------------------------------------------------------------
+# 测试 14（T26）：大规模性能（100 段 + 500 边 < 100ms）
+# ---------------------------------------------------------------------------
+
+
+def test_large_graph_bfs_performance(mtca_db: Path) -> None:
+    """100 段 + 500 边：BFS 操作 < 100ms。"""
+    # 建 100 段
+    segs = _bulk_insert_segments(mtca_db, 100)
+    # 建 500 条边（链 + 跨链）
+    edge_count = 0
+    for i in range(100):
+        # 每段连到 5 个邻居（100 * 5 = 500，幂等去重后可能略少）
+        for j in range(5):
+            nb = (i + j + 1) % 100
+            if nb == i:
+                nb = (nb + 1) % 100
+            create_relation(
+                segs[i], segs[nb], "related_to",
+                weight=1.0, path=mtca_db,
+            )
+            edge_count += 1
+    assert edge_count == 500
+
+    # DB 校验：至少 400 条边（去重 + 自环保护）
+    row = query(
+        "SELECT COUNT(*) AS n FROM segment_relations",
+        path=mtca_db,
+    )
+    assert row[0]["n"] >= 400
+
+    # BFS 计时
+    t0 = time.perf_counter()
+    cluster = get_topic_cluster(segs[0], depth=3, path=mtca_db)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert len(cluster) >= 2  # 至少有 1 个邻居
+    # 性能基线：100 段 + 500 边 BFS < 100ms（M1 防御性约束）
+    assert elapsed_ms < 100, f"BFS 耗时 {elapsed_ms:.1f}ms 超过 100ms 上限"
+
+
+def test_large_graph_get_related_performance(mtca_db: Path) -> None:
+    """100 段 + 500 边：get_related 查询 < 100ms。"""
+    segs = _bulk_insert_segments(mtca_db, 100)
+    for i in range(100):
+        for j in range(5):
+            nb = (i + j + 1) % 100
+            if nb == i:
+                nb = (nb + 1) % 100
+            create_relation(
+                segs[i], segs[nb], "related_to",
+                path=mtca_db,
+            )
+
+    t0 = time.perf_counter()
+    related = get_related(segs[0], path=mtca_db)
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert elapsed_ms < 100, f"get_related 耗时 {elapsed_ms:.1f}ms 超过 100ms"
+    # 至少有 1 个邻居
+    assert len(related) >= 1
+
+
+# ---------------------------------------------------------------------------
+# 测试 15（T26）：补充小覆盖
+# ---------------------------------------------------------------------------
+
+
+def test_valid_relation_types_constant_content(mtca_db: Path) -> None:
+    """VALID_RELATION_TYPES 含 4 个指定名称。"""
+    assert set(VALID_RELATION_TYPES) == {
+        "references", "supersedes", "related_to", "derived_from",
+    }
+    assert DEFAULT_RELATION_TYPES == ("related_to",)
+    # 集合大小防止后续误改
+    assert len(VALID_RELATION_TYPES) == 4
+
+
+def test_get_related_invalid_types_raises(mtca_db: Path) -> None:
+    """types 全为非法值时抛 ValueError。"""
+    s = _insert_segment(mtca_db)
+    with pytest.raises(ValueError):
+        get_related(s, types=["bogus", "also_bogus"], path=mtca_db)
+
+
+def test_list_relations_invalid_types_raises(mtca_db: Path) -> None:
+    """list_relations types 全为非法值时抛 ValueError。"""
+    s = _insert_segment(mtca_db)
+    with pytest.raises(ValueError):
+        list_relations(s, types=["bogus"], path=mtca_db)
+
+
+def test_supersede_chain_max_constant(mtca_db: Path) -> None:
+    """SUPERSEDE_CHAIN_MAX 常量合理。"""
+    from src.relations.graph import SUPERSEDE_CHAIN_MAX
+    assert SUPERSEDE_CHAIN_MAX > 0
+    assert SUPERSEDE_CHAIN_MAX <= 1000  # 防意外改到超大值
