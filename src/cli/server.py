@@ -35,6 +35,13 @@ def init():
     click.echo(f'Initializing MTCA at {MTCA_DB_PATH}')
     init_db()
     click.echo('✓ 数据库已初始化')
+    # T33 启动时自动备份
+    try:
+        from src.store.backup import backup_now
+        bk = backup_now()
+        click.echo(f'✓ 已自动备份 → {bk.name}')
+    except Exception as exc:
+        click.echo(f'⚠ 自动备份失败：{exc}', err=True)
 
 
 @main.command()
