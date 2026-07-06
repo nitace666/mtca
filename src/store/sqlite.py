@@ -421,6 +421,11 @@ def get_connection(
 
     conn.row_factory = sqlite3.Row
     _apply_pragmas(conn)
+    # M2.5.1 schema 迁移：连接即升级（向后兼容旧库，幂等）
+    try:
+        _migrate_to_v2(conn)
+    except sqlite3.Error:
+        pass  # 表不存在（全新 DB 尚未 init_db），由后续 init_db 处理
     try:
         yield conn
         conn.commit()
