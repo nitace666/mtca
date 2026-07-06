@@ -44,6 +44,10 @@ try:
     from src.store.sqlite import query
 except ImportError:
     from store.sqlite import query
+try:
+    from src.errors import classify_exception, print_user_error
+except ImportError:
+    from errors import classify_exception, print_user_error
 
 
 # ---------------------------------------------------------------------------
@@ -314,9 +318,27 @@ def _echo_err(msg: str) -> None:
     click.echo(f"[ERR] {msg}", err=True)
 
 
-@click.group(help="MTCA 时间线 CLI（T12）")
-def cli() -> None:
-    """MTCA 时间线组：timeline / tree。"""
+class _TimelineGroup(click.Group):
+    """MTCA CLI 组：把 click.UsageError（含 BadParameter / MissingParameter）
+    翻译为中文友好提示（M2.5.8 A-3.5）。
+    """
+
+    def invoke(self, ctx):
+        """M2.5.8 A-3.5：在子命令 invoke 阶段 catch click.UsageError。
+        
+        为什么不在 parse_args：Group 的 parse_args 只解析组本身的参数；
+        子命令的 parse_args（在子命令的 make_context 内）才是 raise 点。
+        所以 catch 必须放在 invoke 里，包裹 super().invoke(ctx) 调用。
+        """
+        try:
+            return super().invoke(ctx)
+        except click.UsageError as e:
+            wrapped = classify_exception(e)
+            print_user_error(wrapped)
+            ctx.exit(wrapped.code)
+
+
+cli = _TimelineGroup(help="MTCA 时间线 CLI（T12）")
 
 
 @cli.command("timeline")
@@ -334,9 +356,10 @@ def _click_timeline(period: str, project: Optional[str], query_text: Optional[st
     try:
         output = render_timeline(period=period, project=project,
                                  query_text=query_text, limit=limit, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     click.echo(output, nl=False)
 
 
@@ -349,9 +372,10 @@ def _click_tree(project: Optional[str], limit: int, db_path: Optional[str]) -> N
     """mtca tree [--project=X]"""
     try:
         output = render_tree(project=project, limit=limit, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     click.echo(output, nl=False)
 
 
@@ -382,9 +406,10 @@ def _argparse_main(argv: Optional[list[str]] = None) -> int:
                                   query_text=args.query, limit=args.limit, path=args.db_path), end="")
         elif args.cmd == "tree":
             print(render_tree(project=args.project, limit=args.limit, path=args.db_path), end="")
-    except (ValueError, RuntimeError) as e:
-        print(f"[ERR] {e}", file=sys.stderr)
-        return 2
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        return wrapped.code
     return 0
 
 

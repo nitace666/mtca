@@ -50,6 +50,10 @@ try:
     from src.fog.fog_engine import fog_segment as _fog_segment
 except ImportError:
     from fog.fog_engine import fog_segment as _fog_segment
+try:
+    from src.errors import classify_exception, print_user_error
+except ImportError:
+    from errors import classify_exception, print_user_error
 
 
 # ---------------------------------------------------------------------------
@@ -292,9 +296,28 @@ def _echo_err(msg: str) -> None:
     click.echo(f"[ERR] {msg}", err=True)
 
 
-@click.group(help="MTCA 用户控制 CLI（T11 + M2.5.4）")
-def cli() -> None:
-    """MTCA 用户控制组：important / cycle / archive / fog / urgent / done / postpone。"""
+class _UserControlsGroup(click.Group):
+    """MTCA CLI 组：把 click.UsageError（含 BadParameter / MissingParameter）
+    翻译为中文友好提示（M2.5.8 A-3.5）。
+    """
+
+    def invoke(self, ctx):
+        """M2.5.8 A-3.5：在子命令 invoke 阶段 catch click.UsageError。
+        
+        为什么不在 parse_args：Group 的 parse_args 只解析组本身的参数；
+        子命令的 parse_args（在子命令的 make_context 内）才是 raise 点。
+        所以 catch 必须放在 invoke 里，包裹 super().invoke(ctx) 调用。
+        """
+        try:
+            return super().invoke(ctx)
+        except click.UsageError as e:
+            wrapped = classify_exception(e)
+            print_user_error(wrapped)
+            ctx.exit(wrapped.code)
+
+
+
+cli = _UserControlsGroup(help="MTCA 用户控制 CLI（T11 + M2.5.4）")
 
 
 @cli.command("important")
@@ -308,9 +331,10 @@ def _click_important(segment_id: str, db_path: Optional[str]) -> None:
     """/重要 <segment_id>：score → 10000，tier → L1。"""
     try:
         rows = cmd_important(segment_id, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(f"已 /重要 {segment_id}（rows={rows}）")
 
 
@@ -322,9 +346,10 @@ def _click_cycle(segment_id: str, tag: str, db_path: Optional[str]) -> None:
     """/循环 <segment_id> <tag>：打 cycle_tag，跳过时间衰减。"""
     try:
         rows = cmd_cycle(segment_id, tag, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(f"已 /循环 {tag} {segment_id}（rows={rows}）")
 
 
@@ -335,9 +360,10 @@ def _click_archive(segment_id: str, db_path: Optional[str]) -> None:
     """/归档 <segment_id>：tier → L3_hidden。"""
     try:
         rows = cmd_archive(segment_id, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(f"已 /归档 {segment_id}（rows={rows}）")
 
 
@@ -352,9 +378,10 @@ def _click_fog(segment_id: str, anchor: str, db_path: Optional[str]) -> None:
     """/雾化 <segment_id> --anchor "..."：物理擦除 L0-细节（不可逆）。"""
     try:
         ok = cmd_fog(segment_id, anchor, path=db_path)
-    except (ValueError, PermissionError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(f"已 /雾化 {segment_id} -> {ok}")
 
 
@@ -375,9 +402,10 @@ def _click_urgent(
     """
     try:
         result = cmd_urgent(segment_id, when, anchor=anchor, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(
         f"已 /紧急 {segment_id} → expires={result['expires_at_ms']} (state={result['urgent_state']})"
     )
@@ -390,9 +418,10 @@ def _click_done(segment_id: str, db_path: Optional[str]) -> None:
     """/完成 <segment_id>：用户对 expired/tracking 段标记 completed。"""
     try:
         result = cmd_done(segment_id, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(
         f"已 /完成 {segment_id} → state={result['new_state']} tier={result.get('current_tier', '-')}"
     )
@@ -410,9 +439,10 @@ def _click_postpone(
     """/延期 <segment_id> [when]：重置过期时间（默认 +7d）。"""
     try:
         result = cmd_postpone(segment_id, when, path=db_path)
-    except (ValueError, RuntimeError) as e:
-        _echo_err(str(e))
-        sys.exit(2)
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        sys.exit(wrapped.code)
     _echo_ok(
         f"已 /延期 {segment_id} → expires={result.get('expires_at_ms', '-')} (state={result['new_state']})"
     )
@@ -485,9 +515,10 @@ def _argparse_main(argv: Optional[list[str]] = None) -> int:
         elif args.cmd == "postpone":
             result = cmd_postpone(args.segment_id, args.when, path=db_path)
             print(f"[OK] 已 /延期 {args.segment_id} → expires={result.get('expires_at_ms', '-')} (state={result['new_state']})")
-    except (ValueError, PermissionError, RuntimeError) as e:
-        print(f"[ERR] {e}", file=sys.stderr)
-        return 2
+    except Exception as e:
+        wrapped = classify_exception(e)
+        print_user_error(wrapped)
+        return wrapped.code
     return 0
 
 

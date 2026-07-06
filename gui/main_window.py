@@ -22,6 +22,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Union
 
+import sqlite3
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -40,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.cli.user_controls import cmd_archive, cmd_cycle, cmd_fog, cmd_important
+from src.errors import classify_exception
 from src.l0.segment_writer import get_segment, write_segments
 from src.l0.session_writer import create_session
 from src.recall.recall_engine import search_segments
@@ -70,6 +73,23 @@ _TAB_DETAIL: int = 1
 _TAB_GRAPH: int = 2
 _TAB_ACTIONS: int = 3
 _TAB_QUADRANT: int = 4
+
+
+def _show_error(parent: QWidget, title: str, exc: BaseException) -> None:
+    """GUI 统一错误显示（M2.5.8 A-3）：分类异常 + QMessageBox 友好提示。
+
+    标题：``❌ {title}``
+    正文：``{message}\n\n💡 建议：{suggestion}``（suggestion 为空时只显示 message）
+
+    通过 :func:`src.errors.classify_exception` 把内部异常翻译为
+    :class:`UserFacingError`，由本函数统一渲染。
+    用户看不到 Python traceback，只看到中文 + 可操作建议。
+    """
+    wrapped = classify_exception(exc)
+    body = wrapped.message
+    if wrapped.suggestion:
+        body = f"{wrapped.message}\n\n💡 建议：{wrapped.suggestion}"
+    QMessageBox.warning(parent, f"❌ {title}", body)
 
 
 class MainWindow(QMainWindow):
@@ -345,7 +365,16 @@ class MainWindow(QMainWindow):
         try:
             rows = cmd_important(seg_id, path=self._db_path)
         except (ValueError, RuntimeError) as e:
-            QMessageBox.warning(self, "/重要 失败", str(e))
+            _show_error(self, "/重要 失败", e)
+            return
+        except PermissionError as e:
+            _show_error(self, "/重要 失败", e)
+            return
+        except sqlite3.DatabaseError as e:
+            _show_error(self, "/重要 失败", e)
+            return
+        except Exception as e:
+            _show_error(self, "/重要 失败", e)
             return
         self.statusBar().showMessage(f"已 /重要 {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
@@ -365,7 +394,16 @@ class MainWindow(QMainWindow):
         try:
             rows = cmd_cycle(seg_id, tag, path=self._db_path)
         except (ValueError, RuntimeError) as e:
-            QMessageBox.warning(self, "/循环 失败", str(e))
+            _show_error(self, "/循环 失败", e)
+            return
+        except PermissionError as e:
+            _show_error(self, "/循环 失败", e)
+            return
+        except sqlite3.DatabaseError as e:
+            _show_error(self, "/循环 失败", e)
+            return
+        except Exception as e:
+            _show_error(self, "/循环 失败", e)
             return
         self.statusBar().showMessage(f"已 /循环 {tag} {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
@@ -380,7 +418,16 @@ class MainWindow(QMainWindow):
         try:
             rows = cmd_archive(seg_id, path=self._db_path)
         except (ValueError, RuntimeError) as e:
-            QMessageBox.warning(self, "/归档 失败", str(e))
+            _show_error(self, "/归档 失败", e)
+            return
+        except PermissionError as e:
+            _show_error(self, "/归档 失败", e)
+            return
+        except sqlite3.DatabaseError as e:
+            _show_error(self, "/归档 失败", e)
+            return
+        except Exception as e:
+            _show_error(self, "/归档 失败", e)
             return
         self.statusBar().showMessage(f"已 /归档 {seg_id}（rows={rows}）", 5000)
         self._timeline.refresh()
@@ -405,7 +452,13 @@ class MainWindow(QMainWindow):
         try:
             ok = cmd_fog(seg_id, anchor, path=self._db_path)
         except (ValueError, PermissionError, RuntimeError) as e:
-            QMessageBox.warning(self, "/雾化 失败", str(e))
+            _show_error(self, "/雾化 失败", e)
+            return
+        except sqlite3.DatabaseError as e:
+            _show_error(self, "/雾化 失败", e)
+            return
+        except Exception as e:
+            _show_error(self, "/雾化 失败", e)
             return
         self.statusBar().showMessage(
             f"已 /雾化 {seg_id} -> {ok}", 5000
