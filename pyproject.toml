@@ -34,6 +34,7 @@ dev = [
 [project.scripts]
 mtca-server = "cli.server:main"
 mtca = "cli.timeline:main"
+mtca-mcp = "adapters.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
