@@ -30,6 +30,10 @@ import time
 from pathlib import Path
 from typing import Optional, Union
 
+from src.compress.multi_factor_score import (
+    calculate_score,
+    get_quadrant_from_seg,
+)
 from src.l0.skeleton import extract_keywords
 from src.l0.segment_writer import get_segment, update_segment
 from src.store.sqlite import execute, query
@@ -237,6 +241,8 @@ def _list_active_segments(
         return query(
             "SELECT s.segment_id, s.session_id, s.current_score, "
             "s.current_tier, s.silence_state, s.topic_label, s.fog_anchor, "
+            "s.urgency_level, s.importance_level, s.emotion_tag, "
+            "s.urgent_state, s.promoted_at, s.ref_count, "
             "sess.cycle_tag "
             "FROM segments s "
             "LEFT JOIN sessions sess ON sess.session_id = s.session_id "
@@ -247,6 +253,8 @@ def _list_active_segments(
     return query(
         "SELECT s.segment_id, s.session_id, s.current_score, "
         "s.current_tier, s.silence_state, s.topic_label, s.fog_anchor, "
+        "s.urgency_level, s.importance_level, s.emotion_tag, "
+        "s.urgent_state, s.promoted_at, s.ref_count, "
         "sess.cycle_tag "
         "FROM segments s "
         "LEFT JOIN sessions sess ON sess.session_id = s.session_id "
@@ -267,12 +275,12 @@ def tick(
 ) -> int:
     """每轮对话后异步调用：遍历 silence_state='active' 的段落。
 
-    逻辑（DEVELOPER_PLAN.md §4.2）：
-        1. cycle_tag 非空 -> 跳过衰减（写一条 cycle_skip 审计）；
-        2. score -= PER_TICK_DECAY（最低 0）；
-        3. 引用检测 -> score += REFERENCE_BOOST（最高 IMPORTANT_SCORE）；
-        4. 阈值判断 -> 更新 current_tier；
-        5. 写 score_events。
+    逻辑（M2.5 多因子打分 — 替换线性 -1/tick 衰减）：
+        1. cycle_tag 非空 -> 跳过打分（写 cycle_skip 审计）；
+        2. 引用检测 -> 递增 ref_count（让 calculate_score 中的 f_reference 反映）；
+        3. calculate_score(seg, now) -> (new_score, new_tier)；
+        4. 写 decay / boost 审计（保留旧 event_type 兼容）；
+        5. 落库 current_score / current_tier；tier 变化写 threshold 审计。
 
     参数：
         path: 数据库路径。
@@ -290,6 +298,7 @@ def tick(
     if recent_msgs is None:
         recent_msgs = get_recent_messages(path=path)
 
+    now = _now_ms()
     n_updated = 0
     for seg in segments:
         seg_id = seg["segment_id"]
@@ -297,7 +306,7 @@ def tick(
         old_tier = seg.get("current_tier") or "L0"
         cycle_tag = seg.get("cycle_tag")
 
-        # ---- 1. /循环 跳过衰减 ----
+        # ---- 1. /循环 跳过打分 ----
         if cycle_tag:
             _log_score_event(
                 seg_id, "user_cycle_skip", None,
@@ -307,26 +316,33 @@ def tick(
             )
             continue
 
-        # ---- 2. 衰减 ----
-        new_score = max(0.0, old_score - PER_TICK_DECAY)
+        # ---- 2. 引用检测：递增 ref_count ----
+        #    把实时 Jaccard 命中转成持久化 ref_count（喂给 f_reference）。
+        was_referenced = has_been_referenced(
+            seg, recent_msgs=recent_msgs, path=path,
+        )
+        if was_referenced:
+            current_ref = int(seg.get("ref_count", 0) or 0)
+            new_ref = current_ref + 1
+            update_segment(seg_id, path=path, ref_count=new_ref)
+            seg["ref_count"] = new_ref
+
+        # ---- 3. 多因子打分（M2.5）----
+        new_score, new_tier = calculate_score(seg, now)
+
+        # ---- 4. 审计（保留 decay / boost event_type）----
+        delta = new_score - old_score
         _log_score_event(
-            seg_id, "decay", -PER_TICK_DECAY,
-            old_score, new_score, "per_tick_decay",
+            seg_id, "decay", delta,
+            old_score, new_score, "multi_factor_tick",
             path=path,
         )
-
-        # ---- 3. 引用检测 ----
-        if has_been_referenced(seg, recent_msgs=recent_msgs, path=path):
-            boosted = min(IMPORTANT_SCORE, new_score + REFERENCE_BOOST)
+        if was_referenced:
             _log_score_event(
                 seg_id, "boost", REFERENCE_BOOST,
-                new_score, boosted, "reference_detected",
+                old_score, new_score, "reference_detected",
                 path=path,
             )
-            new_score = boosted
-
-        # ---- 4. 阈值 -> tier ----
-        new_tier = determine_tier(new_score)
 
         # ---- 5. 落库 ----
         update_segment(
