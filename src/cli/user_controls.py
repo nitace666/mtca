@@ -6,11 +6,19 @@ USER_CONTROLS.md §2 的 4 条命令直达 L0 层：
 - /归档：tier ← L3_hidden，不删 L0 全文
 - /雾化：物理擦除 L0-细节，保留骨架 + 锚点句（不可逆）
 
+M2.5.4 新增 3 条紧急追踪命令：
+- /紧急 <seg> <时间>：标记为紧急追踪，到期后强制询问
+- /完成 <seg>：用户对 expired/tracking 段标记 completed
+- /延期 <seg> <时间>：重置过期时间（默认 +7d）
+
 公共 API：
 - ``cmd_important(segment_id, path=None) -> int``
 - ``cmd_cycle(segment_id, cycle_tag, path=None) -> int``
 - ``cmd_archive(segment_id, path=None) -> int``
 - ``cmd_fog(segment_id, anchor, path=None) -> bool``
+- ``cmd_urgent(segment_id, when, anchor=None, path=None) -> dict``
+- ``cmd_done(segment_id, path=None) -> dict``
+- ``cmd_postpone(segment_id, when, path=None) -> dict``
 - ``parse_command(text) -> (cmd, args) | None``
 - ``parse_natural(text) -> (cmd, args) | None``
 - ``main()`` click 组装的 CLI 入口 + argparse 风格 fallback
@@ -20,6 +28,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Union
 
@@ -51,7 +60,10 @@ except ImportError:
 ANCHOR_MAX_LEN: int = 20
 
 # 命令白名单
-_VALID_COMMANDS: frozenset[str] = frozenset({"important", "cycle", "archive", "fog"})
+_VALID_COMMANDS: frozenset[str] = frozenset({
+    "important", "cycle", "archive", "fog",
+    "urgent", "done", "postpone",
+})
 
 # 前缀命令（斜杠 + 中文）→ 命令名
 _PREFIX_TO_CMD: dict[str, str] = {
@@ -59,6 +71,9 @@ _PREFIX_TO_CMD: dict[str, str] = {
     "/循环": "cycle",
     "/归档": "archive",
     "/雾化": "fog",
+    "/紧急": "urgent",
+    "/完成": "done",
+    "/延期": "postpone",
 }
 
 # 自然语言中文关键词 → 命令名（用于 parse_natural）
@@ -67,6 +82,9 @@ _CN_KEYWORD_TO_CMD: dict[str, str] = {
     "循环": "cycle",
     "归档": "archive",
     "雾化": "fog",
+    "紧急": "urgent",
+    "完成": "done",
+    "延期": "postpone",
 }
 
 # 自然语言正则：提取 UUID 风格 segment_id
@@ -126,6 +144,47 @@ def cmd_fog(
 ) -> bool:
     """/雾化：物理擦除 L0-细节，保留骨架 + 锚点句（不可逆）。"""
     return _fog_segment(segment_id, anchor, called_by="user", path=path)
+
+
+def cmd_urgent(
+    segment_id: str,
+    when: str,
+    anchor: Optional[str] = None,
+    path: Optional[Union[Path, str]] = None,
+) -> dict:
+    """/紧急 <seg> <时间>：标记段为 urgent_state='tracking'。
+
+    ``when`` 支持：明天/后天/3d/7d/ISO 日期/毫秒戳（见 _time_parse.parse_expires）。
+    返回 track_urgent 的结果 dict。
+    """
+    # 本地相对导入，避免顶层导入链 + 循环
+    from src.cli._time_parse import parse_expires
+    from src.lifecycle.urgent_tracker import track_urgent
+    now_ms = int(time.time() * 1000)
+    expires = parse_expires(when, now_ms)
+    return track_urgent(segment_id, expires, anchor=anchor, path=path)
+
+
+def cmd_done(
+    segment_id: str,
+    path: Optional[Union[Path, str]] = None,
+) -> dict:
+    """/完成 <seg>：对 expired/tracking 段标 completed（降 L2 + 重写摘要）。"""
+    from src.lifecycle.urgent_tracker import handle_urgent_response
+    return handle_urgent_response(segment_id, "completed", path=path)
+
+
+def cmd_postpone(
+    segment_id: str,
+    when: Optional[str] = None,
+    path: Optional[Union[Path, str]] = None,
+) -> dict:
+    """/延期 <seg> [时间]：重置 expires_at_ms（默认 +7d，由 urgent_tracker.POSTPONE_DAYS）。
+
+    ``when`` 为可选扩展；当前实现走默认 7d 延期（与 M2.5.3 urgent_tracker 兼容）。
+    """
+    from src.lifecycle.urgent_tracker import handle_urgent_response
+    return handle_urgent_response(segment_id, "postponed", path=path)
 
 
 # ---------------------------------------------------------------------------
@@ -233,9 +292,9 @@ def _echo_err(msg: str) -> None:
     click.echo(f"[ERR] {msg}", err=True)
 
 
-@click.group(help="MTCA 用户控制 CLI（T11）")
+@click.group(help="MTCA 用户控制 CLI（T11 + M2.5.4）")
 def cli() -> None:
-    """MTCA 用户控制组：important / cycle / archive / fog。"""
+    """MTCA 用户控制组：important / cycle / archive / fog / urgent / done / postpone。"""
 
 
 @cli.command("important")
@@ -299,6 +358,66 @@ def _click_fog(segment_id: str, anchor: str, db_path: Optional[str]) -> None:
     _echo_ok(f"已 /雾化 {segment_id} -> {ok}")
 
 
+@cli.command("urgent")
+@click.argument("segment_id")
+@click.argument("when")
+@click.option("--anchor", default=None, help="紧急事件的简短说明")
+@click.option("--db", "db_path", type=click.Path(dir_okay=False), default=None)
+def _click_urgent(
+    segment_id: str,
+    when: str,
+    anchor: Optional[str],
+    db_path: Optional[str],
+) -> None:
+    """/紧急 <segment_id> <when>：标记段为紧急追踪。
+
+    WHEN 支持：明天/后天/3d/7d/ISO 日期/毫秒戳。
+    """
+    try:
+        result = cmd_urgent(segment_id, when, anchor=anchor, path=db_path)
+    except (ValueError, RuntimeError) as e:
+        _echo_err(str(e))
+        sys.exit(2)
+    _echo_ok(
+        f"已 /紧急 {segment_id} → expires={result['expires_at_ms']} (state={result['urgent_state']})"
+    )
+
+
+@cli.command("done")
+@click.argument("segment_id")
+@click.option("--db", "db_path", type=click.Path(dir_okay=False), default=None)
+def _click_done(segment_id: str, db_path: Optional[str]) -> None:
+    """/完成 <segment_id>：用户对 expired/tracking 段标记 completed。"""
+    try:
+        result = cmd_done(segment_id, path=db_path)
+    except (ValueError, RuntimeError) as e:
+        _echo_err(str(e))
+        sys.exit(2)
+    _echo_ok(
+        f"已 /完成 {segment_id} → state={result['new_state']} tier={result.get('current_tier', '-')}"
+    )
+
+
+@cli.command("postpone")
+@click.argument("segment_id")
+@click.argument("when", required=False, default=None)
+@click.option("--db", "db_path", type=click.Path(dir_okay=False), default=None)
+def _click_postpone(
+    segment_id: str,
+    when: Optional[str],
+    db_path: Optional[str],
+) -> None:
+    """/延期 <segment_id> [when]：重置过期时间（默认 +7d）。"""
+    try:
+        result = cmd_postpone(segment_id, when, path=db_path)
+    except (ValueError, RuntimeError) as e:
+        _echo_err(str(e))
+        sys.exit(2)
+    _echo_ok(
+        f"已 /延期 {segment_id} → expires={result.get('expires_at_ms', '-')} (state={result['new_state']})"
+    )
+
+
 # ---------------------------------------------------------------------------
 # argparse fallback（click 不可用时）
 # ---------------------------------------------------------------------------
@@ -330,6 +449,18 @@ def _argparse_main(argv: Optional[list[str]] = None) -> int:
     p_fog.add_argument("segment_id")
     p_fog.add_argument("--anchor", required=True)
 
+    p_urg = sub.add_parser("urgent", help="/紧急")
+    p_urg.add_argument("segment_id")
+    p_urg.add_argument("when")
+    p_urg.add_argument("--anchor", default=None)
+
+    p_done = sub.add_parser("done", help="/完成")
+    p_done.add_argument("segment_id")
+
+    p_post = sub.add_parser("postpone", help="/延期")
+    p_post.add_argument("segment_id")
+    p_post.add_argument("when", nargs="?", default=None)
+
     args = parser.parse_args(argv)
     db_path = args.db_path
     try:
@@ -345,6 +476,15 @@ def _argparse_main(argv: Optional[list[str]] = None) -> int:
         elif args.cmd == "fog":
             ok = cmd_fog(args.segment_id, args.anchor, path=db_path)
             print(f"[OK] 已 /雾化 {args.segment_id} -> {ok}")
+        elif args.cmd == "urgent":
+            result = cmd_urgent(args.segment_id, args.when, anchor=args.anchor, path=db_path)
+            print(f"[OK] 已 /紧急 {args.segment_id} → expires={result['expires_at_ms']} (state={result['urgent_state']})")
+        elif args.cmd == "done":
+            result = cmd_done(args.segment_id, path=db_path)
+            print(f"[OK] 已 /完成 {args.segment_id} → state={result['new_state']} tier={result.get('current_tier', '-')}")
+        elif args.cmd == "postpone":
+            result = cmd_postpone(args.segment_id, args.when, path=db_path)
+            print(f"[OK] 已 /延期 {args.segment_id} → expires={result.get('expires_at_ms', '-')} (state={result['new_state']})")
     except (ValueError, PermissionError, RuntimeError) as e:
         print(f"[ERR] {e}", file=sys.stderr)
         return 2
@@ -379,6 +519,7 @@ if __name__ == "__main__":  # pragma: no cover
 __all__ = [
     "ANCHOR_MAX_LEN",
     "cmd_important", "cmd_cycle", "cmd_archive", "cmd_fog",
+    "cmd_urgent", "cmd_done", "cmd_postpone",
     "parse_command", "parse_natural",
     "main", "cli",
 ]
