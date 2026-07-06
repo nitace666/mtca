@@ -1,4 +1,4 @@
-"""动态打分引擎（src/compress/scoring.py — T7）
+﻿"""动态打分引擎（src/compress/scoring.py — T7）
 
 实现 MTCA 长期记忆架构中的动态打分机制：
 - 每轮 tick 衰减 silence_state='active' 段落 1 分
@@ -36,6 +36,8 @@ from src.compress.multi_factor_score import (
 )
 from src.l0.skeleton import extract_keywords
 from src.l0.segment_writer import get_segment, update_segment
+from src.lifecycle.urgent_tracker import tick_urgent
+from src.lifecycle.urgent_tracker import tick_urgent
 from src.store.sqlite import execute, query
 
 # ---------------------------------------------------------------------------
@@ -361,7 +363,11 @@ def tick(
 
         n_updated += 1
 
-    return n_updated
+    # ---- M2.5.3：末尾扫描已过期紧急追踪段 → 转 expired ----
+    expired_ids = tick_urgent(path=path)
+
+    # 返回值含义：实际打分的段数 + 新进入 expired 状态的段数
+    return n_updated + len(expired_ids)
 
 
 # ---------------------------------------------------------------------------
