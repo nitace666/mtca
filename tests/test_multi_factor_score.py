@@ -316,3 +316,27 @@ def test_q2_fresh_segment_in_L1() -> None:
     )
     _score, tier = calculate_score(seg, NOW_MS)
     assert tier == "L1"
+
+
+
+# ---------------------------------------------------------------------------
+# M2.5.8 §7 #2 — URGENT 段 base 不衰减（铁律加固）
+# ---------------------------------------------------------------------------
+
+
+def test_urgent_segment_base_not_decay() -> None:
+    seg = make_seg(current_score=50.0, urgent_state="tracking")
+    new_score, _ = calculate_score(seg, NOW_MS)
+    # urg=0.5 -> f_urgency=1.0, imp=0.5 -> f_importance=1.15
+    # 修复后 base=50 -> new_score=57.5
+    # 修复前 base=49 -> new_score=56.35
+    assert new_score >= 57.0
+
+
+def test_urgent_segment_completed_still_decay() -> None:
+    seg = make_seg(current_score=50.0, urgent_state="completed")
+    new_score, _ = calculate_score(seg, NOW_MS)
+    # completed: base=49 (减 1), f_time *= 0.5
+    # 49 * 1.0 * 1.15 * 1.0 * 1.0 * 0.5 = 28.18
+    assert new_score < 50
+

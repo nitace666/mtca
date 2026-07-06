@@ -106,10 +106,22 @@ _QUERY_KEYWORDS_TOPK: int = 10
 # FTS5 关键词最小长度（短于此长度的高频虚词会被过滤，避免噪声）
 _MIN_TOKEN_LEN: int = 2
 
-# rerank 时：Jaccard 系数 + 段原始分数的混合权重（和为 1.0）
-_WEIGHT_JACCARD: float = 0.7
-_WEIGHT_SCORE: float = 0.3
+# rerank 时：Jaccard 系数 + 段原始分数 + emotion 标签的混合权重（和为 1.0）
+_RERANK_WEIGHT_J: float = 0.5   # Jaccard 相关性
+_RERANK_WEIGHT_S: float = 0.3   # 段 current_score 归一化
+_RERANK_WEIGHT_E: float = 0.2   # emotion_tag rerank 权重
 _SCORE_NORMALIZE: float = 100.0   # 将 current_score 除以该值映射到 [0,1]
+
+# emotion_tag -> rerank 权重（M2.5.8 §7 #1：情绪强度参与排序）
+# NULL/缺失等同于 neutral=0.0，不加分
+_EMOTION_RERANK_WEIGHT: dict = {
+    "excited":  1.0,
+    "positive": 0.7,
+    "anxious":  0.6,
+    "negative": 0.5,
+    "neutral":  0.0,
+    None:       0.0,
+}
 
 # 段内文本字段（rerank 计算相关性用，与 scoring._SEGMENT_TEXT_KEYS 对齐）
 _RERANK_TEXT_KEYS: tuple[str, ...] = ("topic_label", "fog_anchor")
@@ -277,7 +289,7 @@ def search_segments(
 
     sql = (
         "SELECT segment_id, session_id, current_tier, current_score, "
-        "topic_label, fog_anchor, start_at, end_at, fog_state, silence_state "
+        "topic_label, fog_anchor, start_at, end_at, fog_state, silence_state, emotion_tag "
         "FROM segments"
         f"{where_sql} "
         "ORDER BY current_score DESC, start_at DESC LIMIT ?"
@@ -329,7 +341,7 @@ def search_sessions(
     sql = (
         "SELECT s.segment_id, s.session_id, s.current_tier, s.current_score, "
         "s.topic_label, s.fog_anchor, s.start_at, s.end_at, "
-        "s.fog_state, s.silence_state, "
+        "s.fog_state, s.silence_state, s.emotion_tag, "
         "COUNT(m.message_id) AS hit_count "
         "FROM messages_fts fts "
         "JOIN messages m ON m.rowid = fts.rowid "
@@ -340,7 +352,7 @@ def search_sessions(
         f"{topics_clause}"
         f"{time_clause}"
         " GROUP BY s.segment_id, s.session_id, s.current_tier, s.current_score, "
-        "s.topic_label, s.fog_anchor, s.start_at, s.end_at, s.fog_state, s.silence_state "
+        "s.topic_label, s.fog_anchor, s.start_at, s.end_at, s.fog_state, s.silence_state, s.emotion_tag "
         "ORDER BY s.current_score DESC, hit_count DESC LIMIT ?"
     )
 
@@ -422,7 +434,7 @@ def expand_neighbors(
     placeholders2 = ",".join("?" for _ in neighbor_ids)
     return db_query(
         "SELECT segment_id, session_id, current_tier, current_score, "
-        "topic_label, fog_anchor, start_at, end_at, fog_state, silence_state "
+        "topic_label, fog_anchor, start_at, end_at, fog_state, silence_state, emotion_tag "
         f"FROM segments WHERE segment_id IN ({placeholders2})",
         tuple(neighbor_ids),
         path=path,
@@ -442,8 +454,8 @@ def rerank(
     """对候选段按 ``Jaccard + score`` 混合得分重排。
 
     评分公式：
-        ``final = W_J * jaccard + W_S * normalize(current_score)``
-    - ``W_J = 0.7`` / ``W_S = 0.3``（常量）。
+        ``final = W_J * jaccard + W_S * normalize(current_score) + W_E * emotion_weight``
+    - ``W_J = 0.5`` / ``W_S = 0.3`` / ``W_E = 0.2``（常量）。
     - ``normalize`` 把 ``current_score`` 映射到 ``[0,1]``（除以 100）。
     - ``path`` 参数预留（M3 接入嵌入相似度时使用）。
 
@@ -460,8 +472,9 @@ def rerank(
         for c in candidates:
             scored.append({
                 **c,
-                "score": _WEIGHT_SCORE
-                * (_coerce_score_value(c.get("current_score")) / _SCORE_NORMALIZE),
+                "score": (_RERANK_WEIGHT_S
+                    * (_coerce_score_value(c.get("current_score")) / _SCORE_NORMALIZE)
+                    + _RERANK_WEIGHT_E * _EMOTION_RERANK_WEIGHT.get(c.get("emotion_tag"), 0.0)),
             })
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored
@@ -476,7 +489,11 @@ def rerank(
         else:
             jaccard = 0.0
         norm = _coerce_score_value(c.get("current_score")) / _SCORE_NORMALIZE
-        final = _WEIGHT_JACCARD * jaccard + _WEIGHT_SCORE * max(0.0, min(1.0, norm))
+        emotion = c.get("emotion_tag")
+        emo_w = _EMOTION_RERANK_WEIGHT.get(emotion, 0.0)
+        final = (_RERANK_WEIGHT_J * jaccard
+                + _RERANK_WEIGHT_S * max(0.0, min(1.0, norm))
+                + _RERANK_WEIGHT_E * emo_w)
         scored.append({**c, "score": float(final)})
 
     scored.sort(key=lambda x: x["score"], reverse=True)
