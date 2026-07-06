@@ -48,7 +48,11 @@ def calculate_score(seg: dict, now_ms: int) -> tuple[float, str]:
     """
     # 基础衰减（每 tick -1，保留旧逻辑的稳定性兜底）
     current_score = float(seg.get("current_score", 100.0) or 0.0)
-    base = max(0.0, current_score - 1.0)
+    # M2.5.8 §7 #2: URGENT tracking 段 base 不衰减（永不遗忘）
+    if seg.get("urgent_state") == "tracking":
+        base = float(current_score)
+    else:
+        base = max(0.0, current_score - 1.0)
     
     # 4 因子
     urg = float(seg.get("urgency_level", 0.5) or 0.5)
