@@ -108,6 +108,44 @@ python -m src.cli.timeline timeline --period month
 
 ---
 
+
+
+### 5. 一键跑 demo（CLI-only 5 分钟体验）
+
+不用 GUI、不用 shell 命令，一条命令跑通 MTCA 全部核心功能：
+
+```bash
+python examples/demo_run.py
+```
+
+跑完会看到 8 个 step 的中文输出（环境检查 → 隔离 DB → 3 段演示对话 → /紧急 → /重要 → 召回 → 第 9 铁律 → 收尾），全程隔离在 `examples/__demo_db/demo.db`，不会污染你的 `~/.mtca/mtca.db`。
+
+可选参数：
+
+| 选项 | 作用 |
+|---|---|
+| `--keep-db` | 跑完保留 demo DB，方便事后用 GUI 打开看看 |
+| `--db /path/to/isolated.db` | 自定义 DB 路径（测试用） |
+
+退出时默认清理 demo DB；`.bak-<timestamp>` 备份留最近 3 个。
+
+如果只想看代码怎么写、跑哪些 API：
+
+```bash
+python examples/demo_run.py --keep-db
+python -c "import sqlite3; c = sqlite3.connect('examples/__demo_db/demo.db'); \
+  print(c.execute('SELECT segment_id, current_score, urgent_state FROM segments').fetchall())"
+```
+
+SMOKE 测试：
+
+```bash
+python -m pytest tests/test_demo.py -q
+```
+
+5 个测试（端到端：跑 demo / 段数 / URGENT 段 / /重要 段 / 召回 / 铁律 9 不衰减）都过就算 OK。
+
+---
 ## 4. 日常使用：GUI 篇
 
 MTCA 装好后，最常用的入口就是 GUI。这里重点讲窗口的 5 个标签页怎么用。

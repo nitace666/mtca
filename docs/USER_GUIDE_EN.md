@@ -108,6 +108,44 @@ If your database is empty, all four quadrants show "empty". Section 4 explains h
 
 ---
 
+
+
+### 5. Try the 5-minute demo (CLI-only)
+
+Skip the GUI and shell tools — one Python command walks through MTCA's core flow:
+
+```bash
+python examples/demo_run.py
+```
+
+You'll see 8 numbered steps with Chinese output: env check → isolated DB → 3 demo conversations → `/紧急` → `/重要` → recall → Iron Rule 9 verification → cleanup. Everything stays in `examples/__demo_db/demo.db`; your real `~/.mtca/mtca.db` is never touched.
+
+Flags:
+
+| Flag | What it does |
+|---|---|
+| `--keep-db` | keep the demo DB after the run (good for opening it in the GUI afterwards) |
+| `--db /path/to/isolated.db` | write to a custom DB path (handy for tests) |
+
+The script deletes the demo DB at exit and keeps only the most recent 3 `.bak-<timestamp>` backups.
+
+Want to peek at what it wrote?
+
+```bash
+python examples/demo_run.py --keep-db
+python -c "import sqlite3; c = sqlite3.connect('examples/__demo_db/demo.db'); \
+  print(c.execute('SELECT segment_id, current_score, urgent_state FROM segments').fetchall())"
+```
+
+Smoke tests:
+
+```bash
+python -m pytest tests/test_demo.py -q
+```
+
+All 5 should pass (run / segments / URGENT / recall / Iron Rule 9).
+
+---
 ## 4. Day-to-day use: the GUI
 
 After installing MTCA, the GUI is the most common entry point. Here's how to use each of the 5 tabs.

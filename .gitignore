@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+﻿# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -229,4 +229,5 @@ probes/
 
 # Seed script (maintainer-only; regenerate ground truth on demand)
 benchmarks/_seed_test_set.py
-
+examples/__demo_db/
+examples/__demo_db/**
