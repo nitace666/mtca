@@ -117,8 +117,74 @@ def _auto_extract_hook(session_id: str, role: str, content: str, path=None) -> N
 
 
 # ---------------------------------------------------------------------------
-# 会话级：创建 / 查询 / 结束
+# Auto-emotion hook (M2.5.6): end_session 后给最近非 L3_hidden segment 写 emotion_tag
 # ---------------------------------------------------------------------------
+
+
+def _auto_emotion_hook(session_id: str, path=None) -> None:
+    """end_session 后给最近一个非 L3_hidden 段写 emotion_tag。
+
+    行为：
+    - 从已写入的 messages 拼接对话文本，调 LLM 提取 5 标准 emotion。
+    - 找最近一个 current_tier != 'L3_hidden' 的 segment（按 start_at DESC）。
+    - 写入其 emotion_tag 列。
+    - 任何环节失败 / 无 provider / 无 segment → 静默跳过，emotion_tag 保持 NULL。
+
+    设计取舍：
+    - 失败不抛错：emotion_tag 是 best-effort，不影响 end_session 主流程。
+    - 函数内延迟 import：避免 session_writer → segment_writer → time_segmenter → session_writer 循环。
+    """
+    if not session_id:
+        return
+    from src.llm.emotion_extractor import extract_emotion
+    from src.l0.segment_writer import update_segment
+    try:
+        msgs = get_session_messages(session_id, path=path)
+    except Exception:
+        return
+    if not msgs:
+        return
+    # 拼接对话文本（参考 extractor.extract_facts_from_messages 风格）
+    lines = []
+    for m in msgs:
+        content = m.get("content") or ""
+        if not isinstance(content, str) or not content.strip():
+            continue
+        role = m.get("role", "?")
+        lines.append(f"[{role}] {content.strip()}")
+    text = "\n".join(lines)
+    if not text.strip():
+        return
+    try:
+        result = extract_emotion(text)
+    except Exception:
+        return
+    if not isinstance(result, dict):
+        return
+    emo = result.get("emotion")
+    if emo not in ("positive", "negative", "anxious", "excited", "neutral"):
+        return
+    # 找最近非 L3_hidden segment（按 start_at DESC）
+    try:
+        seg_rows = query(
+            "SELECT segment_id FROM segments "
+            "WHERE session_id = ? AND current_tier != 'L3_hidden' "
+            "ORDER BY start_at DESC, start_msg_seq DESC LIMIT 1",
+            (session_id,),
+            path=path,
+        )
+    except Exception:
+        return
+    if not seg_rows:
+        return
+    seg_id = seg_rows[0].get("segment_id")
+    if not seg_id:
+        return
+    # 写入 emotion_tag（update_segment 自动丢弃 None；emo 是合法字符串）
+    try:
+        update_segment(seg_id, path=path, emotion_tag=emo)
+    except Exception:
+        pass
 
 
 def create_session(
@@ -190,6 +256,8 @@ def end_session(
             "UPDATE sessions SET ended_at = ? WHERE session_id = ?",
             (ended_at, session_id),
         )
+    # C2.5.6: 结束后尝试给最近非 L3_hidden segment 写 emotion_tag（best-effort）
+    _auto_emotion_hook(session_id, path=path)
 
 
 # ---------------------------------------------------------------------------
