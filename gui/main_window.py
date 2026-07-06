@@ -47,6 +47,7 @@ from src.store.sqlite import MTCA_DB_PATH
 
 from gui.fog_dialog import FogDialog
 from gui.graph_view import GraphView
+from gui.quadrant_view import QuadrantView
 from gui.segment_detail import SegmentDetail
 from gui.timeline_view import TimelineView
 
@@ -68,6 +69,7 @@ _TAB_TIMELINE: int = 0
 _TAB_DETAIL: int = 1
 _TAB_GRAPH: int = 2
 _TAB_ACTIONS: int = 3
+_TAB_QUADRANT: int = 4
 
 
 class MainWindow(QMainWindow):
@@ -136,6 +138,11 @@ class MainWindow(QMainWindow):
         self._action_panel = self._build_action_panel()
         self._tabs.addTab(self._action_panel, "操作")
 
+        # ---- Tab 4：4 象限（T34）----
+        self._quadrant = QuadrantView()
+        self._quadrant.segment_activated.connect(self._on_quadrant_activated)
+        self._tabs.addTab(self._quadrant, "4 象限")
+
         self.setCentralWidget(self._tabs)
 
     def _build_action_panel(self) -> QWidget:
@@ -190,6 +197,7 @@ class MainWindow(QMainWindow):
         self._timeline.set_db_path(db_path)
         self._detail.set_db_path(db_path)
         self._graph.set_db_path(db_path)
+        self._quadrant.set_db_path(db_path)
 
     # ------------------------------------------------------------------
     # 工具栏回调
@@ -245,6 +253,7 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"已新建会话：{session_id}", 5000)
         self._timeline.refresh()
+        self._quadrant.refresh()
 
     def _on_refresh(self) -> None:
         """刷新：重拉时间线 + 当前段落详情 + 知识图谱。"""
@@ -252,6 +261,7 @@ class MainWindow(QMainWindow):
         if self._current_seg_id:
             self._detail.show_segment(self._current_seg_id)
         self._graph.refresh()
+        self._quadrant.refresh()
         self.statusBar().showMessage(f"已刷新，共 {n} 段", 3000)
 
     def _on_settings(self) -> None:
@@ -269,6 +279,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"DB 已切换：{path_str}", 5000)
         self._timeline.refresh()
         self._graph.refresh()
+        self._quadrant.set_db_path(path_str)
+        self._quadrant.refresh()
 
     # ------------------------------------------------------------------
     # 段落选中回调（来自 TimelineView）
@@ -292,6 +304,10 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"已跳转到段落详情：{seg_id}", 5000
         )
+
+    def _on_quadrant_activated(self, seg_id: str) -> None:
+        """4 象限双击 -> 切到详情 Tab + 加载段落（与图谱一致）。"""
+        self._on_segment_focus(seg_id)
 
     def _set_action_status_from_seg(self, seg_id: str) -> None:
         """按 seg_id 更新「操作」Tab 底部的状态文本。"""
