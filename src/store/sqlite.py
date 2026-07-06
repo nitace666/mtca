@@ -322,6 +322,50 @@ def _apply_pragmas(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 工具：M2.5.1 schema 迁移（幂等 ALTER TABLE）
+# ---------------------------------------------------------------------------
+
+
+def _get_table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    """返回指定表的列名集合（PRAGMA table_info）。"""
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {row[1] for row in rows}
+
+
+def _migrate_to_v2(conn: sqlite3.Connection) -> None:
+    """M2.5.1：segments 表加 5 个字段用于 4 象限评分（向后兼容）。
+
+    新增列：
+        - urgency_level    REAL    DEFAULT 0.5
+        - importance_level REAL    DEFAULT 0.5
+        - emotion_tag      TEXT    DEFAULT NULL
+        - expires_at_ms    INTEGER DEFAULT NULL
+        - urgent_state     TEXT    DEFAULT NULL
+
+    索引：
+        idx_segments_urgent：partial index（urgent_state IS NOT NULL），用于
+        紧急跟踪模块的过期扫描查询。
+
+    幂等：通过 PRAGMA 检查列是否存在，重复执行无副作用。
+    """
+    cols = _get_table_columns(conn, "segments")
+    migrations: list[tuple[str, str]] = [
+        ("urgency_level",   "REAL    DEFAULT 0.5"),
+        ("importance_level", "REAL    DEFAULT 0.5"),
+        ("emotion_tag",      "TEXT    DEFAULT NULL"),
+        ("expires_at_ms",    "INTEGER DEFAULT NULL"),
+        ("urgent_state",     "TEXT    DEFAULT NULL"),
+    ]
+    for col_name, col_def in migrations:
+        if col_name not in cols:
+            conn.execute(f"ALTER TABLE segments ADD COLUMN {col_name} {col_def}")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_segments_urgent "
+        "ON segments(urgent_state) WHERE urgent_state IS NOT NULL"
+    )
+
+
+# ---------------------------------------------------------------------------
 # 公共 API
 # ---------------------------------------------------------------------------
 
@@ -348,6 +392,9 @@ def init_db(path: Optional[Union[Path, str]] = None) -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         _apply_pragmas(conn)
         conn.executescript(_SCHEMA_SQL)
+        conn.commit()
+        # M2.5.1 schema 迁移：旧库 ALTER TABLE 5 字段（幂等）
+        _migrate_to_v2(conn)
         conn.commit()
     except sqlite3.Error as exc:
         raise RuntimeError(f"初始化数据库失败：{exc}") from exc
@@ -493,4 +540,6 @@ __all__ = [
     "query",
     "fog_permit",
     "fog_revoke",
+    "_get_table_columns",
+    "_migrate_to_v2",
 ]

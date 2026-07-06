@@ -49,6 +49,9 @@ _UPDATABLE_FIELDS: frozenset[str] = frozenset({
     "silence_state", "promoted_at", "ref_count",
     "last_ask_at", "user_retention_days", "long_silent",
     "superseded_by", "supersedes_count", "contradiction_level",
+    # M2.5.1 新加：4 象限评分 + 紧急跟踪
+    "urgency_level", "importance_level", "emotion_tag",
+    "expires_at_ms", "urgent_state",
 })
 
 # 合法 SQL 标识符（防 SQL 拼接注入的额外保险）
@@ -77,11 +80,11 @@ def _coerce_value(col: str, value: Any) -> Any:
         return None
     if col in ("end_msg_seq", "gap_to_next", "ref_count",
                "supersedes_count", "user_retention_days",
-               "long_silent"):
+               "long_silent", "expires_at_ms"):
         return int(value)
     if col in ("end_at", "fog_at", "last_ask_at", "promoted_at"):
         return int(value)
-    if col == "current_score":
+    if col in ("current_score", "urgency_level", "importance_level"):
         return float(value)
     if col in ("weak_merged",):
         return 1 if value else 0
