@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -71,15 +73,22 @@ def _seed_messages(
 
 
 def _segments_columns(path: Path) -> set[str]:
-    """读取 segments 表的列名集合。"""
-    with get_connection(path) as conn:
+    """读取 segments 表的列名集合（直接 sqlite3.connect，绕过
+    get_connection 的自动迁移，保持裸读语义）。"""
+    conn = sqlite3.connect(str(path))
+    try:
         rows = conn.execute("PRAGMA table_info(segments)").fetchall()
-    return {row[1] for row in rows}
+        return {row[1] for row in rows}
+    finally:
+        conn.close()
 
 
 def _drop_m251_columns(path: Path) -> None:
-    """模拟 pre-M2.5.1 状态：移除 segments 表的 5 新增列 + 相关索引。"""
-    with get_connection(path) as conn:
+    """模拟 pre-M2.5.1 状态：移除 segments 表的 5 新增列 + 相关索引
+    （直接 sqlite3.connect，绕过 get_connection 的自动迁移，保证
+    DROP 后的状态对调用方可见）。"""
+    conn = sqlite3.connect(str(path))
+    try:
         conn.execute("DROP INDEX IF EXISTS idx_segments_urgent")
         for col in (
             "urgency_level",
@@ -89,6 +98,9 @@ def _drop_m251_columns(path: Path) -> None:
             "urgent_state",
         ):
             conn.execute(f"ALTER TABLE segments DROP COLUMN {col}")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
@@ -328,3 +340,41 @@ def test_update_segment_still_rejects_unknown_field(mtca_db: Path) -> None:
     row = get_segment(para_id, path=mtca_db)
     assert row is not None
     assert abs(float(row["urgency_level"]) - 0.42) < 1e-6
+
+
+# ---------------------------------------------------------------------------
+# 测试 12: get_connection() 触发 M2.5.1 schema 迁移（旧库向后兼容）
+# ---------------------------------------------------------------------------
+
+
+def test_get_connection_triggers_migration(tmp_path: Path) -> None:
+    """get_connection() 必须触发 _migrate_to_v2()（向后兼容旧库）。
+
+    背景：M2.5.1 上线前用户的 DB 不含 5 字段；GUI / CLI 走 get_connection()
+    而非 init_db()，因此旧用户首次启动 GUI 会因缺列导致 4 象限 Tab 崩溃。
+    修复：get_connection() 在 _apply_pragmas 之后调 _migrate_to_v2()。
+    """
+    db = tmp_path / "legacy.db"
+
+    # 1. 建一份完整 DB（含 5 字段 + 索引）
+    init_db(db).close()
+    assert "urgency_level" in _segments_columns(db)
+
+    # 2. 模拟 pre-M2.5.1 状态：移除 5 字段 + 相关索引
+    _drop_m251_columns(db)
+    assert "urgency_level" not in _segments_columns(db)
+
+    # 3. 直接走 get_connection（**不调 init_db**），关闭后检查
+    with get_connection(db) as conn:
+        pass  # 上下文块内 _migrate_to_v2 应已被触发
+
+    # 4. 关连接后验证 5 字段都回来了
+    cols = _segments_columns(db)
+    for col in (
+        "urgency_level",
+        "importance_level",
+        "emotion_tag",
+        "expires_at_ms",
+        "urgent_state",
+    ):
+        assert col in cols, f"列 {col} 应被 get_connection 触发回填"
