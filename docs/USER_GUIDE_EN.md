@@ -511,9 +511,73 @@ Full configuration: [docs/QUICKSTART.md §6](QUICKSTART.md).
 
 > Design principle: **Agent runs its course, MTCA runs its course, no interference, recall on demand.**
 
-### Q10: Can I use pure command line, no GUI?
-
 Yes. All core functions (timeline query / segment operations / urgent tracking) have CLI commands. The GUI is just a more intuitive visual wrapper.
+
+---
+
+## 9.5 Common Errors
+
+> **Important guarantee (M2.5.8 A-3)**: From this version on, **users will never see a Python traceback on errors**.
+> CLI commands write errors to stderr (GUI pops a QMessageBox warning), all in the unified format
+> `❌ one-line English message + 💡 Suggestion: ... + (exit code N)`.
+
+Error messages are produced by `src/errors.py`. Exit code meanings:
+
+| Exit code | Constant | Meaning |
+|---|---|---|
+| 0 | `EXIT_OK` | Success |
+| 1 | `EXIT_USER_ERROR` | User input error (bad parameter / file not found / missing parameter) |
+| 2 | `EXIT_DB_ERROR` | Database error + backward-compatible validation errors |
+| 3 | `EXIT_LLM_ERROR` | LLM provider unavailable / network timeout |
+| 99 | `EXIT_INTERNAL` | Internal unexpected error (should never reach user) |
+
+⚠️ **Exit code 2 is overloaded**: DB errors, validation errors, and permission errors all share code 2.
+This is for backward compatibility with the existing 581 tests. Users distinguish by the message text in stderr.
+A future polish pass will reorganize the EXIT code table.
+
+### 7 Common Errors Quick Reference
+
+| # | Trigger | What you see | Exit code | What to do |
+|---|---|---|---|---|
+| 1 | Bad parameter like `--period invalid` | `❌ Parameter --period is invalid`<br>`💡 Suggestion: Check parameter value. 'invalid' is not one of 'day', 'week', 'month'.` | 1 | Run `--help` to see legal values; check case-sensitivity |
+| 2 | `--db /path/that/does/not/exist.db` typo | `❌ File not found: Z:\`<br>`💡 Suggestion: Verify path, or check if file was deleted` | 1 | Double-check path spelling; for relative paths confirm cwd |
+| 3 | DB file locked (held by another process) | `❌ Database error`<br>`💡 Suggestion: Check ~/.mtca/mtca.db exists and is writable. Original error: database is locked` | 2 | Close other SQLite clients; or restart and retry |
+| 4 | `~/.mtca/mtca.db` not writable | `❌ Permission denied: /home/user/.mtca/mtca.db`<br>`💡 Suggestion: Check file permissions, or run as admin/owner` | 2 | `chmod 644 ~/.mtca/mtca.db`; or use a writable directory |
+| 5 | LLM provider not configured / network down | `❌ LLM call failed`<br>`💡 Suggestion: Check ~/.mtca/config.toml provider section, or network connectivity` | 3 | See `docs/LLM_PROVIDERS.md` §Configuration |
+| 6 | `cmd_important <non-existent segment id>` | `❌ Segment not found: segment_id=xxx`<br>`💡 Suggestion: Use \`timeline\` to find the correct segment ID` | 1 | Use `python -m src.cli.timeline timeline --query <keyword>` to locate |
+| 7 | GUI button action error (e.g. `/important`) | QMessageBox dialog:<br>Title `❌ /important failed`<br>Body `File not found: /x.db` + blank line + `💡 Suggestion: ...`<br>Click OK to dismiss | (GUI: no exit code) | Follow the suggestion in the dialog; or check the status bar |
+
+### How to figure out what just broke
+
+**CLI users**:
+
+```powershell
+# Run a command; check stderr when it fails
+python -m src.cli.timeline timeline --period invalid
+# ❌ Parameter --period is invalid
+# 💡 Suggestion: Check parameter value. 'invalid' is not one of 'day', 'week', 'month'.
+# (exit code 1)
+
+# Check exit code (PowerShell uses $LASTEXITCODE, bash uses $?)
+echo $LASTEXITCODE  # 1
+```
+
+**GUI users**:
+
+The QMessageBox popup IS the error message — no need to dig through logs.
+
+If no popup appeared but the status bar shows red, hover over the status bar text for the full tooltip (sometimes truncated).
+
+### Reporting a bug?
+
+1. Write down the full three-line stderr (or full QMessageBox body)
+2. Note the repro command (sanitized)
+3. Verify `~/.mtca/mtca.db` is intact (`sqlite3 ~/.mtca/mtca.db ".schema"` should run)
+4. Post to issue tracker with 1 + 2 + 3
+
+> ⚠️ **Don't paste a Python traceback screenshot into the issue** — you won't see one
+> because A-3 intercepts tracebacks internally. If you DO see a traceback,
+> that's a bug — please attach the full traceback + repro command.
 
 ---
 

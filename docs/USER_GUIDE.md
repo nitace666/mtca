@@ -509,9 +509,73 @@ python -m src.cli.timeline timeline --query "重要"
 
 > 设计原则：**Agent 跑它的，MTCA 跑 MTCA 的，互不干扰，按需召回。**
 
-### Q10：我不想用 GUI，能纯命令行吗？
-
 可以。MTCA 的核心功能（时间线查询 / 段落操作 / 紧急追踪）全部都有 CLI 命令。GUI 只是更直观的可视化包装。
+
+---
+
+## 9.5 常见错误信息
+
+> **重要保证（M2.5.8 A-3）**：从这一版开始，**用户撞错不再看到 Python traceback**。
+> CLI 命令会把错误打到 stderr（GUI 操作会弹 QMessageBox 警告框），
+> 格式统一为 `❌ 中文一句话 + 💡 建议 + （退出码 N）`。
+
+错误信息由 `src/errors.py` 统一生成。退出码含义：
+
+| 退出码 | 常量名 | 含义 |
+|---|---|---|
+| 0 | `EXIT_OK` | 成功 |
+| 1 | `EXIT_USER_ERROR` | 用户操作错误（参数错 / 文件不存在 / 缺参数） |
+| 2 | `EXIT_DB_ERROR` | 数据库错误 + 兼容旧测试的校验错误 |
+| 3 | `EXIT_LLM_ERROR` | LLM provider 不可用 / 网络超时 |
+| 99 | `EXIT_INTERNAL` | 内部未预期错误（理论上不应该看到） |
+
+⚠️ **退出码 2 是"过载"的**：DB 错误、参数校验、权限不足都共用 2，
+这是为了向后兼容既有 581 个测试。用户从 stderr 的 message 文本能区分。
+未来 polish 会重整 EXIT 码表。
+
+### 7 个常见错误速查
+
+| # | 触发场景 | 你会看到 | 退出码 | 怎么办 |
+|---|---|---|---|---|
+| 1 | `--period invalid` 之类参数填错 | `❌ 参数 --period 非法`<br>`💡 建议：检查参数值是否合法。'invalid' is not one of 'day', 'week', 'month'.` | 1 | 看 `--help` 确认合法值；值是否大小写敏感 |
+| 2 | `--db /path/that/does/not/exist.db` 路径写错 | `❌ 文件不存在：Z:\`<br>`💡 建议：检查路径是否正确，或文件是否已被删除` | 1 | 检查路径拼写；如果是相对路径，确认当前目录 |
+| 3 | 数据库文件 locked（被另一个进程占用） | `❌ 数据库错误`<br>`💡 建议：检查 ~/.mtca/mtca.db 是否存在且可写。原始错误：database is locked` | 2 | 关掉其他 SQLite 客户端；或重启后重试 |
+| 4 | `~/.mtca/mtca.db` 没写权限 | `❌ 权限不足：/home/user/.mtca/mtca.db`<br>`💡 建议：检查文件权限，或用管理员/属主身份运行` | 2 | `chmod 644 ~/.mtca/mtca.db`；或换一个有写权限的目录 |
+| 5 | LLM provider 没配 / 网络不通 | `❌ LLM 调用失败`<br>`💡 建议：检查 ~/.mtca/config.toml 中 provider 配置，或网络是否通畅` | 3 | 见 `docs/LLM_PROVIDERS.md` §配置 |
+| 6 | `cmd_important <不存在段ID>` | `❌ 段落不存在：segment_id=xxx`<br>`💡 建议：用 `timeline` 命令查一下正确的段 ID` | 1 | 用 `python -m src.cli.timeline timeline --query <关键词>` 找段 |
+| 7 | GUI 点按钮撞错（如 `/重要`） | QMessageBox 弹窗：<br>标题 `❌ /重要 失败`<br>正文 `文件不存在：/x.db` + 空行 + `💡 建议：...`<br>点 OK 关掉 | （GUI 不退出码） | 按弹窗里的建议操作；或看状态栏 |
+
+### 怎么定位"我刚才到底撞了什么错"
+
+**CLI 用户**：
+
+```powershell
+# 跑命令，撞错时看 stderr
+python -m src.cli.timeline timeline --period invalid
+# ❌ 参数 --period 非法
+# 💡 建议：检查参数值是否合法。'invalid' is not one of 'day', 'week', 'month'.
+# （退出码 1）
+
+# 检查退出码（PowerShell 用 $LASTEXITCODE，bash 用 $?）
+echo $LASTEXITCODE  # 1
+```
+
+**GUI 用户**：
+
+QMessageBox 弹窗就是错误信息本身，不需要查日志。
+
+如果弹窗没出现但状态栏显示红色，先把鼠标停在状态栏文本上看完整 tooltip（有时文字会被截断）。
+
+### 出错想报告 bug？
+
+1. 记下完整的 stderr 三行（或 QMessageBox 正文）
+2. 记下复现命令（脱敏后）
+3. 查 `~/.mtca/mtca.db` 是否完整（`sqlite3 ~/.mtca/mtca.db ".schema"` 应能跑）
+4. 发到 issue tracker，附 1+2+3
+
+> ⚠️ **不要把 Python traceback 截图发 issue**——你不会看到 traceback，
+> 因为 A-3 已经把 traceback 拦截在内部了。如果真看到了 traceback，
+> 那是 bug，请附完整 traceback + 复现命令。
 
 ---
 
