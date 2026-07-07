@@ -48,6 +48,7 @@ except ImportError:
 from collections import OrderedDict
 import hashlib
 import json
+import sqlite3  # M3-5: 用于读 settings 表判断 vector_recall_enabled
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -681,7 +682,44 @@ def recall(
         results = merged_facts + results
 
     _cache_put(cache_key, results)
+    _cache_put(cache_key, results)
+
+    # ------------------------------------------------------------------
+    # M3-5 向量通道（默认关闭，606 测试不破）
+    # 流程：读 settings.vector_recall_enabled -> "1" 才构造 VectorIndex
+    #       -> 调 idx.search(query, k=safe_top_k, path=str(path))
+    #       -> _fuse_3way RRF(K=60) 融合到 results
+    # 任何异常 -> 静默，不影响主流程
+    # 不动既有签名 / 既有路径 / rerank 权重
+    # ------------------------------------------------------------------
+    try:
+        _v_enabled = False
+        if path is not None:
+            _v_conn = sqlite3.connect(str(path))
+            try:
+                _row = _v_conn.execute(
+                    "SELECT value FROM settings WHERE key = ?",
+                    ("vector_recall_enabled",),
+                ).fetchone()
+                if _row and _row[0] == "1":
+                    _v_enabled = True
+            finally:
+                _v_conn.close()
+        if _v_enabled:
+            from src.recall.vector_index import VectorIndex  # 局部 import 避免 import 时崩
+            _v_conn = sqlite3.connect(str(path))
+            try:
+                _idx = VectorIndex(mtca_conn=_v_conn)
+                _v_hits = _idx.search(query, k=safe_top_k, path=str(path))
+                results = _fuse_3way_rrf(results, _v_hits, k=60)
+            finally:
+                _v_conn.close()
+    except Exception:
+        # 静默兜底，主流程不断
+        pass
+
     return results
+
 
 
 # ---------------------------------------------------------------------------
@@ -767,3 +805,45 @@ __all__ = [
     "recall_with_fallback",
     "get_recent_sessions",
 ]
+
+
+
+# ---------------------------------------------------------------------------
+# M3-5: RRF(K=60) 融合 FTS + 向量召回结果
+# ---------------------------------------------------------------------------
+
+def _fuse_3way_rrf(
+    fts_hits: list[dict],
+    vector_hits: list[dict],
+    k: int = 60,
+) -> list[dict]:
+    """RRF(K=60) 融合两路召回,按 segment_id 去重。
+
+    公式:score(d) = sum_r 1 / (k + rank_r(d))
+    - rank 从 0 开始
+    - K=60 是经典默认（Wikipedia / Elastic 文档均推荐）
+
+    返回:重排后的 list[dict],保持原 dict 结构,只调整顺序与合并。
+    若 vector hit 是新 segment_id 且无 messages 字段,降权排在 results 末尾;
+    若已在 results 里,加分但保持原 dict(messages / tier / 等不变)。
+    """
+    scores: dict[str, float] = {}
+    by_sid: dict[str, dict] = {}
+
+    for rank, h in enumerate(fts_hits or []):
+        sid = h.get("segment_id")
+        if not sid:
+            continue
+        scores[sid] = scores.get(sid, 0.0) + 1.0 / (k + rank + 1)
+        by_sid.setdefault(sid, h)
+
+    for rank, h in enumerate(vector_hits or []):
+        sid = h.get("segment_id")
+        if not sid:
+            continue
+        scores[sid] = scores.get(sid, 0.0) + 1.0 / (k + rank + 1)
+        if sid not in by_sid:
+            by_sid[sid] = h
+
+    ranked_sids = sorted(scores.keys(), key=lambda s: -scores[s])
+    return [by_sid[s] for s in ranked_sids]

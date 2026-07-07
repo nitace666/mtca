@@ -365,6 +365,35 @@ def _migrate_to_v2(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v3_add_vector_cache(conn: sqlite3.Connection) -> None:
+    """M3-5：加 vector_cache 表存 segment embedding（Sidecar cache,避免重复调 Ollama）。
+
+    表结构：
+        segment_id   TEXT    NOT NULL   -- 段落 ID
+        chunk_idx    INTEGER NOT NULL   -- 长段切块后的块序号（从 0 开始）
+        embedding    BLOB    NOT NULL   -- 768 floats × 4 字节 (struct.pack little-endian)
+        model_hash   TEXT    NOT NULL   -- 模型版本指纹（升级 embedding 模型时区分旧/新数据）
+        ts           INTEGER NOT NULL   -- 写入时间（毫秒）
+        PRIMARY KEY (segment_id, chunk_idx)
+
+    幂等：通过 _get_table_columns 检查 vector_cache 是否存在,重复执行无副作用。
+
+    不动 v2 migration（向后兼容 M2.5.1 既有迁移路径）。
+    """
+    cols = _get_table_columns(conn, "vector_cache")
+    if not cols:
+        conn.execute(
+            "CREATE TABLE vector_cache ("
+            "segment_id TEXT NOT NULL, "
+            "chunk_idx INTEGER NOT NULL, "
+            "embedding BLOB NOT NULL, "
+            "model_hash TEXT NOT NULL, "
+            "ts INTEGER NOT NULL, "
+            "PRIMARY KEY (segment_id, chunk_idx)"
+            ")"
+        )
+
+
 # ---------------------------------------------------------------------------
 # 公共 API
 # ---------------------------------------------------------------------------
@@ -395,6 +424,8 @@ def init_db(path: Optional[Union[Path, str]] = None) -> sqlite3.Connection:
         conn.commit()
         # M2.5.1 schema 迁移：旧库 ALTER TABLE 5 字段（幂等）
         _migrate_to_v2(conn)
+        # M3-5 schema 迁移：加 vector_cache 表（Sidecar embedding 缓存,幂等）
+        _migrate_to_v3_add_vector_cache(conn)
         conn.commit()
     except sqlite3.Error as exc:
         raise RuntimeError(f"初始化数据库失败：{exc}") from exc
