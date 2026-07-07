@@ -628,3 +628,33 @@ QMessageBox 弹窗就是错误信息本身，不需要查日志。
 ---
 
 **反馈**：规则不合理 → 改 `AI_RULES.md`；文档错误 → 改本文件或提 GitHub Issue；BUG → 在 GitHub 提 Issue。
+
+
+## 12. 同步接口预留（M2.5.8 B，未来云同步插座）
+
+**当前默认行为**：MTCA **不发任何数据到云端**。本地 SQLite 是唯一权威。
+
+### 设计目的
+
+为未来的云同步（Dropbox / iCloud / 自建 CRDT）预留标准接口；当前实现仅为 no-op 占位，确保未来接入云同步时**核心代码无需改动**。
+
+### 三个核心组件
+
+1. **`SyncAdapter`**（`src/sync/sync_adapter.py`）：云同步协议。任意第三方实现只需满足 `push(data) / pull(since_ms) / status()` 三个方法。
+2. **`LocalOnlySync`**（`src/sync/local_only_sync.py`）：默认 no-op 实现。本地最权威，push 返回原 id，pull 永远空列表，status 报告 `mode=local_only`。
+3. **`registry`**（`src/sync/registry.py`）：全局注册表，懒初始化，`threading.Lock` 保护并发安全。
+
+### 三个 sync 钩子
+
+`src/l0/segment_writer.py`、`src/l0/session_writer.py`、`src/llm/facts_store.py` 末尾各加一个 `sync_X_to_adapter(id, adapter=None, path=None)` 函数。失败不抛异常，仅 `warning` 日志 + 返回 `""`。
+
+### 手动验证
+
+```bash
+python -c "from src.sync import get_adapter; a = get_adapter(); print(type(a).__name__, a.status())"
+# 期望：LocalOnlySync {'mode': 'local_only', 'last_sync_ms': None, 'pending': 0, 'errors': []}
+```
+
+### 未来接入云同步
+
+实现一个满足 `SyncAdapter` 协议的类，调用 `src.sync.set_adapter(my_adapter)` 即可切换全局适配器，**核心 writer 代码 0 改动**。
