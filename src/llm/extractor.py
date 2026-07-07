@@ -34,6 +34,13 @@ _DEFAULT_CONFIDENCE: float = 0.7
 # 提炼用的 max_tokens（要给 LLM 留够输出 JSON 列表的余量）
 _EXTRACT_MAX_TOKENS: int = 512
 
+# smart-retry 提示词（Bug#2 修复 M2.5.8 C）：追加到 user 末尾，鼓励 LLM 重新审视
+_SMART_RETRY_HINT: str = (
+    "\n\n（重试 {n}/2）请再次仔细审视对话："
+    "即便讨论技术问题，也可以提取出概念定义、常见陷阱、工具用法等事实命题。"
+    "若确实无任何可提炼事实再返回 []，否则请尽量返回 JSON 列表。"
+)
+
 # system prompt：明确要求 JSON 输出
 _SYSTEM_PROMPT: str = (
     "你是一个事实提炼助手。从用户对话中提取可被长期记忆的事实命题。"
@@ -73,7 +80,7 @@ def build_extraction_prompt(text: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*)```", re.DOTALL)
 
 
 def _parse_facts_from_text(llm_text: str) -> list[dict]:
@@ -213,12 +220,25 @@ def _get_provider(provider: Optional[Any] = None) -> Any:
     return get_provider("auto")
 
 
-def _llm_generate(provider: Any, text: str) -> str:
-    """调用 LLM，返回 content 字符串。失败抛 RuntimeError。"""
+def _llm_generate(provider: Any, text: str, attempt: int = 0) -> str:
+    """调用 LLM，返回 content 字符串。失败抛 RuntimeError。
+
+    Bug#1 修复（M2.5.8 C）：手动拼接 system + 两换行 + user。
+    原代码只取 prompt["user"]，system 被丢弃 -> LLM 看不到 role/schema 约束。
+    改用手动拼接的原因：4 个 provider（Ollama / LMStudio / LlamaCpp / Cloud）
+    都不支持 system kwargs（Ollama 单 prompt 字段；其余 messages 写死 user role）。
+
+    参数：
+        provider: LLM provider 实例
+        text: 待提炼文本
+        attempt: retry 计数（0=首次；>=1 时追加 smart-retry 提示鼓励 LLM 重新审视）
+    """
     prompt = build_extraction_prompt(text)
-    # 拼成单条 user message（provider 只支持单字符串输入）
-    full_user = prompt["user"]
-    return provider.generate(full_user, max_tokens=_EXTRACT_MAX_TOKENS)
+    user = prompt["user"]
+    if attempt >= 1:
+        user = user + _SMART_RETRY_HINT.format(n=attempt)
+    full_prompt = prompt["system"] + "\n\n" + user
+    return provider.generate(full_prompt, max_tokens=_EXTRACT_MAX_TOKENS)
 
 
 # ---------------------------------------------------------------------------
@@ -226,10 +246,21 @@ def _llm_generate(provider: Any, text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def extract_facts(text: str, provider: Optional[Any] = None) -> list[dict]:
+def extract_facts(
+    text: str,
+    provider: Optional[Any] = None,
+    max_retries: int = 2,
+) -> list[dict]:
     """从单段文本提炼 facts。
 
-    解析失败 → 返回 []（不抛错）。
+    Bug#2 修复（M2.5.8 C）：空结果 / 解析失败 -> 自动 retry 最多 max_retries=2 次。
+    重试时 user prompt 追加 smart-retry 提示，鼓励 LLM 重新审视对话。
+    解析失败 / 重试用完仍空 → 返回 []（不抛错，保持向后兼容）。
+
+    参数：
+        text: 待提炼文本
+        provider: LLM provider；None 时走 auto 探测
+        max_retries: 空结果 / parse 失败时最多重试次数；0 = 不重试
     """
     if not isinstance(text, str) or not text.strip():
         return []
@@ -237,18 +268,23 @@ def extract_facts(text: str, provider: Optional[Any] = None) -> list[dict]:
         prov = _get_provider(provider)
     except Exception:
         return []
-    try:
-        llm_text = _llm_generate(prov, text)
-    except Exception:
-        return []
-    facts = _parse_facts_from_text(llm_text)
-    # 非 JSON / 无内容 → 返回 []（保守策略，避免存垃圾）
-    return facts
+
+    for attempt in range(max_retries + 1):
+        try:
+            llm_text = _llm_generate(prov, text, attempt=attempt)
+        except Exception:
+            # 单次 LLM 失败不算终态，下一轮继续
+            continue
+        facts = _parse_facts_from_text(llm_text)
+        if facts:
+            return facts
+    return []
 
 
 def extract_facts_from_messages(
     messages: list[dict],
     provider: Optional[Any] = None,
+    max_retries: int = 2,
 ) -> list[dict]:
     """从多条消息提炼 facts。
 
@@ -269,7 +305,7 @@ def extract_facts_from_messages(
     if not lines:
         return []
     text = "\n".join(lines)
-    return extract_facts(text, provider=provider)
+    return extract_facts(text, provider=provider, max_retries=max_retries)
 
 
 def extract_and_store(
@@ -278,6 +314,7 @@ def extract_and_store(
     segment_id: Optional[str] = None,
     provider: Optional[Any] = None,
     path: Optional[Union[Path, str]] = None,
+    max_retries: int = 2,
 ) -> list[str]:
     """提炼并直接写入 facts 表，返回 ``[fact_id, ...]``。
 
@@ -285,7 +322,7 @@ def extract_and_store(
     """
     if not isinstance(text, str) or not text.strip():
         return []
-    facts = extract_facts(text, provider=provider)
+    facts = extract_facts(text, provider=provider, max_retries=max_retries)
     fids: list[str] = []
     for f in facts:
         fid = create_fact(

@@ -660,3 +660,46 @@ python -c "from src.sync import get_adapter; a = get_adapter(); print(type(a).__
 ### Future cloud-sync integration
 
 Implement a class that satisfies the `SyncAdapter` protocol, then call `src.sync.set_adapter(my_adapter)` to swap the global adapter. **Zero changes to core writer code** are required.
+
+## 13. facts extraction optimization (M2.5.8 C)
+
+MTCA automatically extracts facts from your conversations into long-term memory. M2.5.8 C fixes 3 subtle bugs to make this more accurate.
+
+### What was fixed
+
+| Bug | Symptom | Fix |
+|---|---|---|
+| Bug#1 critical | LLM could not see role/schema constraints → freeform output | `_llm_generate` prepends system prompt to user before calling LLM |
+| Bug#2 medium | LLM occasionally returned empty / schema-drift → missing facts | `extract_facts` adds smart retry (up to 2 attempts; retry user prompt appends a hint to re-examine the dialog) |
+| Bug#3 minor | Fenced JSON containing nested code blocks was truncated by the regex | `_JSON_FENCE_RE` changed to greedy match |
+
+### Effect
+
+Before: spike v2 hit_rate **86%** (43 / 50 cases)
+After: spike v2 hit_rate **≥ 85%** (regression check, no new degradation)
+
+Full spike data: see the "Post-fix rerun" section of `benchmarks/_m258_facts_retry_spike.md`.
+
+### Advanced usage
+
+If you want to disable retry (for example, when debugging single-shot LLM output), pass `max_retries=0`:
+
+```python
+from src.llm.extractor import extract_facts
+
+# No retry (pre-fix behavior)
+facts = extract_facts(text, provider=my_provider, max_retries=0)
+
+# Default (recommended): retry up to 2 times
+facts = extract_facts(text, provider=my_provider)  # max_retries defaults to 2
+```
+
+- `max_retries=0`: no retry (pre-fix behavior)
+- `max_retries=2` (default): retry up to 2 times on empty result / parse failure
+- `max_retries=N`: custom retry count
+
+### Related
+
+- Code: `src/llm/extractor.py`
+- Tests: `tests/test_extractor_bug_fixes.py` (5 tests covering the 3 bugs)
+- Spike report: `benchmarks/_m258_facts_retry_spike.md`

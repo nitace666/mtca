@@ -658,3 +658,46 @@ python -c "from src.sync import get_adapter; a = get_adapter(); print(type(a).__
 ### 未来接入云同步
 
 实现一个满足 `SyncAdapter` 协议的类，调用 `src.sync.set_adapter(my_adapter)` 即可切换全局适配器，**核心 writer 代码 0 改动**。
+
+## 13. facts 抽取优化（M2.5.8 C）
+
+MTCA 会自动从你的对话里提炼 facts 存进长期记忆。M2.5.8 C 修了 3 个细节让这件事更准。
+
+### 修了什么
+
+| Bug | 表现 | 修复 |
+|---|---|---|
+| Bug#1 重大 | LLM 看不到 role/schema 约束，输出自由发挥 | `_llm_generate` 把 system prompt 拼到 user 前面再传给 LLM |
+| Bug#2 中 | LLM 偶发返回空或格式漂移 → 漏抽 | `extract_facts` 加 smart retry，最多 2 次重试（重试时 user prompt 追加"请再次仔细审视对话"提示） |
+| Bug#3 轻 | 含嵌套代码块的 fence JSON 被正则截短 | `_JSON_FENCE_RE` 改贪婪匹配 |
+
+### 效果
+
+修复前：spike v2 hit_rate **86%**（50 case 抽到 43 条）
+修复后：spike v2 hit_rate **≥ 85%**（回归验证，未引入新退化）
+
+详细 spike 数据见 `benchmarks/_m258_facts_retry_spike.md` 的"修复后重跑"小节。
+
+### 高级用法
+
+如果你想关掉 retry（比如调试时想看 LLM 单次原始输出），可以传 `max_retries=0`：
+
+```python
+from src.llm.extractor import extract_facts
+
+# 不重试（修复前的行为）
+facts = extract_facts(text, provider=my_provider, max_retries=0)
+
+# 默认（推荐）：最多重试 2 次
+facts = extract_facts(text, provider=my_provider)  # max_retries 默认 2
+```
+
+- `max_retries=0`：不重试（修前行为）
+- `max_retries=2`（默认）：空结果 / parse 失败时自动重试 2 次
+- `max_retries=N`：自定义重试次数
+
+### 相关
+
+- 代码：`src/llm/extractor.py`
+- 测试：`tests/test_extractor_bug_fixes.py`（5 个测试覆盖 3 bug）
+- spike 报告：`benchmarks/_m258_facts_retry_spike.md`
