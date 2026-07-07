@@ -24,3 +24,10 @@ __all__ = [
     "set_adapter",
     "reset_adapter",
 ]
+
+# ---------------------------------------------------------------------------
+# M3-0 spike：3 方案 sync 选型原型（仅 spike 用，不进生产）
+# ---------------------------------------------------------------------------
+# - 路径：src.sync.prototypes.{lww, litestream_like, crdt_simple}
+# - 公共入口：src.sync.prototypes.get_adapter(name)
+# - 注意：prototypes 仅 spike 验证用，生产同步实现请走 SyncAdapter 协议
