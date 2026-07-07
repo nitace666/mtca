@@ -12,6 +12,9 @@ pytest>=7.0
 pytest-cov>=4.0
 pytest-benchmark>=4.0
 
+# M3-5 向量召回层
+chromadb>=0.5
+
 # M2 起才会用到，本文件保留占位
 # mcp>=1.0
 # httpx>=0.25

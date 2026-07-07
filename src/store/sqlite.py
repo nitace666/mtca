@@ -365,6 +365,120 @@ def _migrate_to_v2(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_to_v3_add_vector_cache(conn: sqlite3.Connection) -> None:
+    """M3-5：加 vector_cache 表存 segment embedding（Sidecar cache,避免重复调 Ollama）。
+
+    表结构：
+        segment_id   TEXT    NOT NULL   -- 段落 ID
+        chunk_idx    INTEGER NOT NULL   -- 长段切块后的块序号（从 0 开始）
+        embedding    BLOB    NOT NULL   -- 768 floats × 4 字节 (struct.pack little-endian)
+        model_hash   TEXT    NOT NULL   -- 模型版本指纹（升级 embedding 模型时区分旧/新数据）
+        ts           INTEGER NOT NULL   -- 写入时间（毫秒）
+        PRIMARY KEY (segment_id, chunk_idx)
+
+    幂等：通过 _get_table_columns 检查 vector_cache 是否存在,重复执行无副作用。
+
+    不动 v2 migration（向后兼容 M2.5.1 既有迁移路径）。
+    """
+    cols = _get_table_columns(conn, "vector_cache")
+    if not cols:
+        conn.execute(
+            "CREATE TABLE vector_cache ("
+            "segment_id TEXT NOT NULL, "
+            "chunk_idx INTEGER NOT NULL, "
+            "embedding BLOB NOT NULL, "
+            "model_hash TEXT NOT NULL, "
+            "ts INTEGER NOT NULL, "
+            "PRIMARY KEY (segment_id, chunk_idx)"
+            ")"
+        )
+
+def _migrate_to_v4_fts5_trigram(conn: sqlite3.Connection) -> None:
+    """M3-5 Step 8 B2 修复：messages_fts 从 unicode61 改 trigram（中文 token 化生效）。
+
+    背景：
+    - unicode61 对中文按 Unicode word boundary 分词，但 CJK 连续字符无 word boundary，
+      整段中文当 1 个 long token。FTS5 MATCH 要求 query 与 token 完全相等才能命中，
+      导致中文 query 命中率 ~0。
+    - trigram 是 FTS5 内置 tokenize（无需新依赖），按 3 字符 trigrams 索引中文字符串。
+      query 切 trigrams 与 content trigrams 重叠即命中，query ≥ 3 字符即可工作。
+
+    影响：
+    - messages_fts 重建（DROP + CREATE + 从 messages 表 rebuild）
+    - 附属表 messages_fts_data / messages_fts_idx / messages_fts_docsize / messages_fts_config
+      也 DROP（外键依附）
+    - 触发器 messages_fts_ai/_ad/_au 也重建（DELETE-INSERT 同步逻辑不变）
+
+    幂等：检查现有 messages_fts 的 CREATE TABLE SQL 是否含 tokenize='trigram'。
+    - 已是 trigram：no-op
+    - 是 unicode61 或其他：执行 DROP+CREATE+rebuild
+
+    设 PRAGMA user_version = 4（schema 版本标记），便于外部检测。
+    """
+    # 检查现有 messages_fts 的 tokenize
+    cur = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='messages_fts'"
+    )
+    row = cur.fetchone()
+    if row is not None and row[0] and "tokenize" in row[0] and "trigram" in row[0]:
+        # 已是 trigram，无需迁移
+        conn.execute("PRAGMA user_version = 4")
+        return
+
+    # DROP 旧 messages_fts 及附属表 / 触发器
+    conn.executescript("""
+        DROP TABLE IF EXISTS messages_fts;
+        DROP TABLE IF EXISTS messages_fts_data;
+        DROP TABLE IF EXISTS messages_fts_idx;
+        DROP TABLE IF EXISTS messages_fts_docsize;
+        DROP TABLE IF EXISTS messages_fts_config;
+        DROP TRIGGER IF EXISTS messages_fts_ai;
+        DROP TRIGGER IF EXISTS messages_fts_ad;
+        DROP TRIGGER IF EXISTS messages_fts_au;
+    """)
+
+    # CREATE 新 messages_fts（tokenize='trigram'）+ 同步触发器
+    conn.executescript("""
+        CREATE VIRTUAL TABLE messages_fts USING fts5(
+            content,
+            content='messages',
+            content_rowid='rowid',
+            tokenize='trigram'
+        );
+        CREATE TRIGGER messages_fts_ai AFTER INSERT ON messages
+        BEGIN
+            INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+        CREATE TRIGGER messages_fts_ad AFTER DELETE ON messages
+        BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, content)
+            VALUES('delete', old.rowid, old.content);
+        END;
+        CREATE TRIGGER messages_fts_au AFTER UPDATE ON messages
+        BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, content)
+            VALUES('delete', old.rowid, old.content);
+            INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+    """)
+
+    # 从 messages 表 rebuild 索引（仅当 messages 表存在且非空）
+    table_check = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
+    ).fetchone()
+    if table_check is not None:
+        row_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        if row_count > 0:
+            conn.execute(
+                "INSERT INTO messages_fts(rowid, content) "
+                "SELECT rowid, content FROM messages"
+            )
+
+    # 标记 schema 版本
+    conn.execute("PRAGMA user_version = 4")
+
+
+
 # ---------------------------------------------------------------------------
 # 公共 API
 # ---------------------------------------------------------------------------
@@ -395,6 +509,10 @@ def init_db(path: Optional[Union[Path, str]] = None) -> sqlite3.Connection:
         conn.commit()
         # M2.5.1 schema 迁移：旧库 ALTER TABLE 5 字段（幂等）
         _migrate_to_v2(conn)
+        # M3-5 schema 迁移：加 vector_cache 表（Sidecar embedding 缓存,幂等）
+        _migrate_to_v3_add_vector_cache(conn)
+        # Step 8 B2 修复：messages_fts 改 trigram（中文 token 化）
+        _migrate_to_v4_fts5_trigram(conn)
         conn.commit()
     except sqlite3.Error as exc:
         raise RuntimeError(f"初始化数据库失败：{exc}") from exc
