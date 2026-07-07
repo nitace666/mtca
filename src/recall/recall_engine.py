@@ -69,12 +69,48 @@ _RECALL_CACHE_MAX = 128
 _RECALL_CACHE: "OrderedDict[str, list[dict]]" = OrderedDict()
 
 
-def _recall_cache_key(query, time_window, topics, top_k, path):
+def _recall_cache_key(query, time_window, topics, top_k, path, vector_enabled: bool = False):
+    """计算召回缓存 key。
+
+    Step 7 B4 修复：增加 `vector_enabled` 参数，使同一 query 在 vector 状态
+    切换时 cache key 不同，避免 cache 命中错位。
+    """
     payload = json.dumps(
-        {"p": str(path) if path else "", "q": query, "tw": time_window, "to": topics or [], "k": top_k},
+        {"p": str(path) if path else "", "q": query, "tw": time_window,
+         "to": topics or [], "k": top_k, "ve": bool(vector_enabled)},
         sort_keys=True, ensure_ascii=False,
     )
     return hashlib.md5(payload.encode("utf-8")).hexdigest()
+
+
+def _read_vector_enabled_from_settings(path) -> bool:
+    """读 settings.vector_recall_enabled -> True/False。
+
+    无 path / conn 异常 / 无 key / 值不是 '1' -> False（保守默认关）。
+    用于 B4 修复：cache key 加入 vector 状态。
+    """
+    if path is None:
+        return False
+    try:
+        conn = sqlite3.connect(str(path))
+    except Exception:
+        return False
+    try:
+        cur = conn.execute(
+            "SELECT value FROM settings WHERE key = ?",
+            ("vector_recall_enabled",),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return False
+        return row[0] == "1"
+    except Exception:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def _cache_get(key):
@@ -599,7 +635,10 @@ def recall(
     fetch_limit = safe_top_k * 4
 
     # T28 LRU cache check
-    cache_key = _recall_cache_key(query, tw, topics, safe_top_k, path)
+    # Step 7 B4 修复：cache_key 包含 vector_enabled 状态，避免开/关切换后命中错位
+    _vector_enabled = _read_vector_enabled_from_settings(path)
+    cache_key = _recall_cache_key(query, tw, topics, safe_top_k, path,
+                                  vector_enabled=_vector_enabled)
     hit = _cache_get(cache_key)
     if hit is not None:
         return list(hit)
@@ -627,7 +666,9 @@ def recall(
         fact_results = _search_facts_channel(query, safe_top_k, path=path)
         if fact_results:
             return list(fact_results)
-        return []
+        # Step 7 B3 修复：不直接 return []，让流程继续到向量块（向量层"救命"）。
+        # 行为不变：当 vector 关闭（默认）时，向量块跳过 + 后续流程在 merged=[] 上
+        # 返空，最终仍 return results=[]。
 
     # 邻居展开（以合并后的段为中心）
     expanded = expand_neighbors(
@@ -843,7 +884,11 @@ def _fuse_3way_rrf(
             continue
         scores[sid] = scores.get(sid, 0.0) + 1.0 / (k + rank + 1)
         if sid not in by_sid:
-            by_sid[sid] = h
+            # Step 7 B3 修复附带：vector hit 可能没有 session_id 字段（VectorIndex.search
+            # 仅返 segment_id/score/chunk_idx）。补 session_id=None 让 expand_neighbors
+            # 等下游用 dict 访问的代码不爆（None key 会让 WHERE session_id 返空）。
+            by_sid[sid] = dict(h)
+            by_sid[sid].setdefault("session_id", None)
 
     ranked_sids = sorted(scores.keys(), key=lambda s: -scores[s])
     return [by_sid[s] for s in ranked_sids]
