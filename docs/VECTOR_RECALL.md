@@ -148,3 +148,34 @@ hits = idx.search(query, k=10, path=None)
 ```
 feat(recall): M3-5 加向量召回层（Ollama nomic-embed + ChromaDB），3 路并存，Ollama 不可达 fallback FTS5，默认关闭
 ```
+
+## 现状（M3.5 整合后，2026-07-08）
+
+本节为 M3.5 整体整合后的最新状态（相对初版有 3 个 bug 修复 + openclaw HTTP transport 集成）：
+
+### 已修问题
+
+| Bug | 触发时机 | 修法 | commit |
+|---|---|---|---|
+| Step 3 漏 import chromadb | Step 5 真连 ChromaDB 触发 NameError | +1 行 import chromadb（src/recall/vector_index.py:27 后）| adf0967 |
+| FTS5 unicode61 中文 token 化失效（Bug 2 / B2）| 老板 L0 probe：unicode61 整段当 1 token 命中 0；M3-5 benchmark 4/5 场景空 | 换 tokenize=trigram（v4 migration，DROP+CREATE+rebuild）| df0ecad |
+| recall_engine.py 向量块位置 bug（Bug 3 / B3）| baseline 空场景走不到向量层 | 删 if not merged 的 return []，让流程继续到向量块 | 77f5a06 |
+| _recall_cache_key 不含 vector 状态（Bug 4 / B4）| 同一 query 在 vector 开/关切换后 cache 命中错位 | cache key 增 vector_enabled 参数，recall 入口读 settings 一次传入 | 77f5a06 |
+
+### 仍待修 spec bug（独立任务排期，不在本 commit 修）
+
+| Bug | 严重性 | 修复方向 |
+|---|---|---|
+| FTS5 trigram 对 2 字符 query 不命中 | LOW（实战 query 多 >= 3 字符）| 可能要 jieba 分词 + custom tokenize，或 jieba-ikt 配合 unicode61 |
+| vector_cache schema 验证缺失 | LOW（schema 简单，Step 3 已手测）| 加 tests/test_vector_cache_schema.py（PRAGMA table_info 断言）|
+
+### openclaw HTTP transport 集成（Step 10）
+
+MTCA 现已通过 src/adapters/openclaw_http_adapter.py 接 openclaw HTTP transport（MCP 2025-03-26 spec）。
+openclaw 实战配 mcp.servers.trae.url = http://127.0.0.1:8765/mcp，adapter 绑 127.0.0.1:8765/mcp 端点，6 tool 路由到既有 src.adapters.mcp_server.TOOLS。
+
+详细使用见 src/adapters/openclaw_http_adapter.py docstring。
+
+### 完整交付报告
+
+见 docs/M3.5_REPORT.md（M3.5 整体交付总结：6 commit / 9 文件 / 2154 行 / 633 测试 / openclaw HTTP 实通）。
