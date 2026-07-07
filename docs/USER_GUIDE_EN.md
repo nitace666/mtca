@@ -630,3 +630,33 @@ Once you're comfortable, here's where to go deeper:
 ---
 
 **Feedback**: rule disagreement → edit `AI_RULES.md`; doc errors → edit this file or open GitHub Issue; bugs → open GitHub Issue.
+
+
+## 12. Sync interface reservation (M2.5.8 B, future cloud-sync socket)
+
+**Current default behavior**: MTCA **never sends data to the cloud**. The local SQLite database is the single source of truth.
+
+### Design purpose
+
+Reserve a standard interface for future cloud sync (Dropbox / iCloud / self-hosted CRDT); the current implementation is a no-op placeholder, ensuring that when cloud sync ships later, **core code requires zero changes**.
+
+### Three core components
+
+1. **`SyncAdapter`** (`src/sync/sync_adapter.py`): the cloud-sync protocol. Any third-party implementation only needs to satisfy three methods — `push(data) / pull(since_ms) / status()`.
+2. **`LocalOnlySync`** (`src/sync/local_only_sync.py`): the default no-op. The local store is authoritative; `push` returns the original id, `pull` always returns an empty list, `status` reports `mode=local_only`.
+3. **`registry`** (`src/sync/registry.py`): a global registry, lazily initialized, guarded by `threading.Lock` for concurrency safety.
+
+### Three sync hooks
+
+At the tail of `src/l0/segment_writer.py`, `src/l0/session_writer.py`, and `src/llm/facts_store.py`, a `sync_X_to_adapter(id, adapter=None, path=None)` function is appended. Failures do not raise — they only emit a `warning` log and return `""`.
+
+### Manual verification
+
+```bash
+python -c "from src.sync import get_adapter; a = get_adapter(); print(type(a).__name__, a.status())"
+# Expected: LocalOnlySync {'mode': 'local_only', 'last_sync_ms': None, 'pending': 0, 'errors': []}
+```
+
+### Future cloud-sync integration
+
+Implement a class that satisfies the `SyncAdapter` protocol, then call `src.sync.set_adapter(my_adapter)` to swap the global adapter. **Zero changes to core writer code** are required.

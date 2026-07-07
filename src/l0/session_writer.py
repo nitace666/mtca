@@ -386,10 +386,56 @@ def get_session_messages(
 # 导出
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# M2.5.8 B：同步接口预留（云同步插座）
+# ---------------------------------------------------------------------------
+
+import logging  # noqa: E402  追加在文件末段
+from typing import TYPE_CHECKING  # noqa: E402
+
+if TYPE_CHECKING:
+    from src.sync.sync_adapter import SyncAdapter
+
+log = logging.getLogger(__name__)
+
+
+def sync_session_to_adapter(
+    session_id: str,
+    adapter=None,
+    path=None,
+) -> str:
+    '''把指定 session 同步到适配器（默认 LocalOnlySync no-op）。
+
+    失败不抛异常（不阻塞本地操作），仅 warning log + 返回 ""。
+    适配器未指定时使用 src.sync.get_adapter() 获取的全局实例。
+
+    返回值：成功时为 adapter.push(data) 的返回值（通常是远端 id）；
+    失败 / 会话不存在时返回 ""。
+    '''
+    if adapter is None:
+        from src.sync import get_adapter
+        adapter = get_adapter()
+    try:
+        sess = get_session(session_id, path=path)
+        if sess is None:
+            log.warning("sync_session_to_adapter: session 不存在 id=%s", session_id)
+            return ""
+        data = {
+            "type": "session",
+            "id": session_id,
+            "payload": dict(sess),
+            "ts": int(time.time() * 1000),
+        }
+        return adapter.push(data)
+    except Exception as exc:
+        log.warning("sync_session_to_adapter 失败 id=%s err=%s", session_id, exc)
+        return ""
+
 __all__ = [
     "create_session",
     "write_message",
     "get_session_messages",
     "get_session",
     "end_session",
+    "sync_session_to_adapter",
 ]

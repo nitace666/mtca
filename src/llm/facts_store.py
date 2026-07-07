@@ -190,6 +190,51 @@ def count_facts(path: Optional[Union[Path, str]] = None) -> int:
     return int(rows[0]["n"]) if rows else 0
 
 
+# ---------------------------------------------------------------------------
+# M2.5.8 B：同步接口预留（云同步插座）
+# ---------------------------------------------------------------------------
+
+import logging  # noqa: E402  追加在文件末段
+from typing import TYPE_CHECKING  # noqa: E402
+
+if TYPE_CHECKING:
+    from src.sync.sync_adapter import SyncAdapter
+
+log = logging.getLogger(__name__)
+
+
+def sync_fact_to_adapter(
+    fact_id: str,
+    adapter=None,
+    path=None,
+) -> str:
+    '''把指定 fact 同步到适配器（默认 LocalOnlySync no-op）。
+
+    失败不抛异常（不阻塞本地操作），仅 warning log + 返回 ""。
+    适配器未指定时使用 src.sync.get_adapter() 获取的全局实例。
+
+    返回值：成功时为 adapter.push(data) 的返回值（通常是远端 id）；
+    失败 / fact 不存在时返回 ""。
+    '''
+    if adapter is None:
+        from src.sync import get_adapter
+        adapter = get_adapter()
+    try:
+        fact = get_fact(fact_id, path=path)
+        if fact is None:
+            log.warning("sync_fact_to_adapter: fact 不存在 id=%s", fact_id)
+            return ""
+        data = {
+            "type": "fact",
+            "id": fact_id,
+            "payload": dict(fact),
+            "ts": int(time.time() * 1000),
+        }
+        return adapter.push(data)
+    except Exception as exc:
+        log.warning("sync_fact_to_adapter 失败 id=%s err=%s", fact_id, exc)
+        return ""
+
 __all__ = [
     "create_fact",
     "get_fact",
@@ -198,4 +243,5 @@ __all__ = [
     "search_facts",
     "delete_fact",
     "count_facts",
+    "sync_fact_to_adapter",
 ]
