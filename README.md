@@ -1,166 +1,67 @@
 # MTCA — Multi-Tier Context Architecture
 
-> **AI 长期记忆中间件**：本地第一，用户决策，极简 stack，多档模型自适应。
-
----
+> AI 长期记忆中间件。Local-first. User-controlled. L0 immutable. Active forgetting by design.
 
 ## 这是什么
 
-MTCA 不是一个 Agent，不接管用户的 AI 工具，也不替代任何 Agent 平台（OpenClaw / Hermes / 扣子 等）。MTCA 是一个**外挂的长期记忆中间件**——
+MTCA 是给 AI Agent 的**外挂长期记忆中间件**。它在你电脑本地持久化所有对话,提供 8+1 条铁律保障的存储语义,让任何 Agent 通过 MCP / REST 接入,按需召回任意时段的原始对话。
 
-> **Agent 跑它的，MTCA 跑 MTCA 的，互不干扰，按需召回。**
+MTCA **不替代**任何 Agent 平台(OpenClaw / Hermes / Claude Code / Cursor / ...),它是一个旁路工具 —— **Agent 跑它的,MTCA 跑 MTCA 的,互不干扰,按需召回**。
 
-MTCA 在底层替用户**全文持久化所有对话**（L0），并对外提供 **多档压缩视图**（L1/L2/L3）供大模型按需检索。任何 Agent 都通过 MCP Server 或 REST API 接入，调用接口拿回的总是 L0 原文，永不丢精度。
+## 快速开始
 
----
+```bash
+pip install mtca-memory
+mtca init            # 初始化 SQLite 数据库
+mtca-server start    # 启动 MTCA 服务(独立进程)
 
-## 设计哲学（8 条铁律，不动摇）
-
-1. **数据主权在用户** ——本地 SQLite，系统自带磁盘加密，用户掌控。
-2. **L0 双层 + AI 不可变** ——L0 拆成「骨架」（话题/时间/关键词/锚点句）和「细节」（完整对话）。AI 对两层都无权修改或删除；**用户**可主动「雾化」细节层。
-3. **L1–L3 是视图** ——可重建、可损失，错了回 L0-骨架。
-4. **雾化 = 用户主动丢弃细节** ——AI 召回时第一次返回「XX 片段已删除」+ 骨架关键词；之后不主动提起该片段。
-5. **AI 召回错误自动回 L0-骨架** ——摘要层丢失的，骨架 + 关键词兜底。
-6. **用户控制接口直达 L0** ——`/重要 /循环 /归档 /雾化` 跳过任何压缩、直接改 L0 状态。
-7. **GUI 优先** ——时间线、树状、雾化、话题编辑全在 GUI；CLI 仅作开发期辅助。
-8. **存储成本由用户承担** ——纯文本 1–2 GB / 年，可忽略。
-
----
-
-## 核心概念
-
-### 雾化（Fog）：用户主动丢弃细节
-
-> **删除 ≠ 抹除话题，而是「雾化细节」。**
-
-话题本身保留「骨架」（标题 + 时间 + 关键词 + 锚点句），但具体对话内容被**物理擦除**。
-AI 召回时按状态返回：
-
-| 雾化状态 | AI 召回行为 | 转移规则 |
-|---|---|---|
-| `clear` | 完整 L0 原文 | 用户 `/雾化` → `fogged_once` |
-| `fogged_once` | 「片段已删除，关键词：xxx」+ 锚点句 | 触发 1 次后 → `archived` |
-| `archived` | 不再主动召回（除非用户直接搜关键词）| 永久 |
-
-**约束**：
-- 雾化**不可逆**——用户责任自负
-- AI 无 /雾化 权限（API 也不接受此命令）
-- 骨架（话题标题 / 时间 / 关键词 / 锚点句）**永远保留**
-
-### L0 双层结构
-
-```
-┌─────────────────────────────────────────┐
-│ L0-骨架  不可变  用户/AI 都无权删        │ ← 话题标题 / 时间 / 关键词 / 锚点句
-├─────────────────────────────────────────┤
-│ L0-细节  AI 不可变 / 用户可雾化          │ ← 完整对话 / 工具调用 / 长文本
-└─────────────────────────────────────────┘
+# 在你的 Agent 平台配置 MCP 地址
+# Claude Code / Cursor 等支持 stdio MCP 的客户端可直连
 ```
 
-### GUI 优先
-
-- M1 直接出 GUI MVP：时间线 + 话题树 + /雾化 按钮
-- 技术栈待定（PySide6 / Tauri / Electron，M1 启动时拍板）
-- CLI 仅作开发期辅助工具
-
-### 网络访问
-
-| 模式 | 地址 | 场景 |
-|---|---|---|
-| 本地 | `127.0.0.1:port` | 单机自用（M1 默认）|
-| 局域网 | `0.0.0.0:port` | 多设备同 WiFi（M1 末尾可启用）|
-| 远程 | `0.0.0.0:port` + token | 公网访问（M2+ 需 token 鉴权）|
-
----
-
-## 一句话价值主张
-
-> **让 AI 真正记得住 N 年前的事——本地优先——用户决策——极简 stack——与现有 Agent 不冲突。**
-
----
+详见 [docs/QUICKSTART.md](docs/QUICKSTART.md)。
 
 ## 核心特性
 
-| 维度 | 现状 | MTCA 之后 |
-|------|------|-----------|
-| 3 年前对话找回 | 3–5% (RAG 默认) | 95%+ (L0 骨架 + 细节双层兜底) |
-| 数据位置 | 云 | 本地 SQLite |
-| 长期记忆成本 | API 不停调用 → 涨价 | 本地模型 / 云 API 灵活切换 |
-| 接入成本 | 0 (无) | GUI 零代码启动 + MCP / REST |
-| 用户对记忆的权 | 看 AI 心情 | `/重要 /循环 /归档 /雾化` + GUI 时间线 |
-| 与 Agent 关系 | — | **并存**：Agent 跑它的，MTCA 跑 MTCA 的，召回自动对齐 |
-| 主动遗忘 | 平台决定 | 用户雾化 = 不可逆擦除细节，AI 召回时返回「已删除」 |
-| 操作界面 | 命令行 / API | GUI 优先（CLI 仅开发期辅助）|
+| 维度 | MTCA |
+|------|------|
+| 数据位置 | 本地 SQLite,用户掌控 |
+| 长期记忆成本 | 一次性 + 极低(纯文本 1-2 GB / 年) |
+| 接入成本 | GUI 零代码 + MCP 5 行配置 |
+| 用户对记忆的权 | `/重要 /循环 /归档 /雾化` + GUI 时间线 |
+| 与 Agent 关系 | **并存**:Agent 跑它的,MTCA 跑 MTCA 的 |
+| 主动遗忘 | 用户主动 `/雾化` = 物理擦除细节 |
+| N 年前对话找回率 | 95%+ (vs RAG 默认 3-5%) |
 
----
+## 设计哲学(8+1 铁律)
 
-## 项目结构
-
-```
-MTCA/
-├── README.md                  ← 本文件
-├── DEVELOPER_PLAN.md           ← 完整开发文档（架构 / 数据模型 / 模块 / 路线图）
-├── DEVELOPER_PLAN_v0.2.md     ← 上一版（保留 1 周前对照）
-├── docs/
-│   ├── ARCHITECTURE.md         ← 架构详解
-│   ├── DATA_MODEL.md           ← L0–L3 + 动态打分数
-│   ├── ADAPTERS.md             ← Agent 平台适配
-│   └── USER_CONTROLS.md        ← /重要 /循环 /归档 可视化
-├── src/
-│   ├── store/                  ← SQLite + FTS5 + Qdrant 适配
-│   ├── l0/                     ← 原文层（不可变）
-│   ├── l1/  l2/  l3/           ← 压缩视图（可变）
-│   ├── recall/                 ← 双通道召回 + 段落展开
-│   ├── compress/               ← 本地模型异步压缩
-│   ├── llm/                    ← 多档模型适配（本地 / 在线）
-│   ├── adapters/               ← MCP Server / REST / OpenClaw / Hermes / 扣子
-│   └── cli/                    ← CLI + 时间线可视化
-├── tests/
-├── benchmarks/                 ← 50 段验证集
-└── examples/                   ← 接入示例
-```
-
----
-
-## 快速开始（开发中，M1 完成后可用）
-
-```bash
-# 安装
-pip install mtca-memory
-
-# 启动 MTCA 服务（独立进程）
-mtca-server start
-
-# 在 OpenClaw / Hermes / 扣子 等 Agent 中配置 MCP 地址
-# MTCA 自动接管所有对话的 L0 持久化
-```
-
-更详细见 `docs/ADAPTERS.md`。
-
----
-
-## 路线图
-
-- **M1（v0.3）** ≈ 50h ≈ 1 周——长期记忆 MVP：L0-A/L0-B + 时间分段 + 动态打分 + CLI 时间线
-- **M2（v0.4）** ≈ 70h —— MCP Server + 双通道召回 + Web 时间线 UI
-- **M3（v0.5）** ≈ 80h —— L1–L3 压缩视图 + 本地 5B 接入 + 自适应档位
-- **M4（v0.6）** ≈ 60h —— OpenClaw / Hermes / 扣子 适配器
-- **M5（v1.0）** ≈ 80h —— 100 段真实用户测试 + 开源 + 文档完整化
-
----
+1. **数据主权在用户** — 本地 SQLite,系统自带磁盘加密
+2. **L0 双层 + AI 不可变** — 骨架(标题/时间/关键词/锚点句)+ 细节(完整对话),AI 无任何层修改权
+3. **L1-L3 是视图** — 可重建、可损失,错了回 L0-骨架
+4. **雾化 = 用户主动丢弃细节** — 物理擦除 L0-细节,保留骨架
+5. **召回错误自动回 L0-骨架** — 摘要丢失的,骨架 + 关键词兜底
+6. **用户控制接口直达 L0** — `/重要 /循环 /归档 /雾化` 跳过任何压缩
+7. **GUI 优先** — 时间线、树状、雾化按钮全在 GUI
+8. **存储成本由用户承担** — 1-2 GB / 年,可忽略
+9. **重要记忆永不遗忘** — 标 `/重要`、URGENT、Q1 类段永不丢失
 
 ## 文档导览
 
-| 需求 | 看哪 |
-|------|------|
-| 我想理解整体架构 | `docs/ARCHITECTURE.md` |
-| 我想知道 L0–L3 数据怎么存 | `docs/DATA_MODEL.md` |
-| 我想在 X 平台接入 MTCA | `docs/ADAPTERS.md` |
-| 我想看用户控制接口规范 | `docs/USER_CONTROLS.md` |
-| 我要 M1 全部任务表 | `DEVELOPER_PLAN.md` 第五节 |
-
----
+| 我想... | 看哪 |
+|---------|------|
+| 装好跑通 | [docs/QUICKSTART.md](docs/QUICKSTART.md) |
+| 用起来 / 看懂 GUI | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
+| 用 `/重要 /循环 /归档 /雾化` | [docs/USER_CONTROLS.md](docs/USER_CONTROLS.md) |
+| 接 Claude Code / Cursor | [docs/MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) |
+| 接入其他 Agent 平台 | [docs/ADAPTERS.md](docs/ADAPTERS.md) |
+| 配 LLM 后端 | [docs/LLM_PROVIDERS.md](docs/LLM_PROVIDERS.md) |
+| 看架构(高层) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## 协议
 
-MTCA v0.3 SPDX-License-Identifier: MIT。开源协议，所有人均可商用。
+MIT License — 开源协议,所有人可商用。
+
+## 反馈
+
+- 产品问题 / Bug / 想法 → [GitHub Issues](https://github.com/nitace666/mtca/issues)
+- 接入集成问题 → [GitHub Discussions](https://github.com/nitace666/mtca/discussions)

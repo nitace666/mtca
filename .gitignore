@@ -231,3 +231,6 @@ probes/
 benchmarks/_seed_test_set.py
 examples/__demo_db/
 examples/__demo_db/**
+
+# Syncause tracer local config (user-specific, do not track)
+.syncause/
