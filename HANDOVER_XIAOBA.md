@@ -6,12 +6,12 @@
 
 ## 启动前必读（按顺序）
 
-1. `I:\PROJECTS\MTCA\README.md` —— 项目导览 + 8 条铁律
-2. `I:\PROJECTS\MTCA\DEVELOPER_PLAN.md` —— 完整开发文档
-3. `I:\PROJECTS\MTCA\docs\DATA_MODEL.md` —— schema 详细说明
-4. `I:\PROJECTS\MTCA\docs\ARCHITECTURE.md` —— 架构图与设计动机
-5. `I:\PROJECTS\MTCA\docs\V0.4_PIVOT.md` —— v0.4 方向调整（必读）
-6. `I:\PROJECTS\MTCA\docs\COMPETITOR_ANALYSIS.md` —— 6 家竞品横向对比
+1. `./README.md` —— 项目导览 + 8 条铁律
+2. `./DEVELOPER_PLAN.md` —— 完整开发文档
+3. `./docs\DATA_MODEL.md` —— schema 详细说明
+4. `./docs\ARCHITECTURE.md` —— 架构图与设计动机
+5. `./docs\V0.4_PIVOT.md` —— v0.4 方向调整（必读）
+6. `./docs\COMPETITOR_ANALYSIS.md` —— 6 家竞品横向对比
 
 ---
 
@@ -159,6 +159,6 @@ T{id} 挂掉
 
 ## 联系
 
-- 项目路径：`I:\PROJECTS\MTCA\`
+- 项目路径：`./`
 - 启动口令：老板 / 波波发布
 - v0.4 必读：`docs/V0.4_PIVOT.md`

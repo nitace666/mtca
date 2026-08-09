@@ -1,7 +1,7 @@
 # MTCA AI 协作规则（v0.4 Vibe Coding 版）
 
 > **所有 AI 开发者必读本文件，遵守后才能开始写代码。**
-> 本文件由 `I:\PROJECTS\MTCA\.trae\rules\mtca.md` 项目规则引用。
+> 本文件由 `./.trae\rules\mtca.md` 项目规则引用。
 > 最后更新：2026-07-04
 
 ---

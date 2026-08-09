@@ -126,7 +126,7 @@ curl -X POST http://localhost:7777/api/recall \
 ## 7. 隔离与权限
 
 - MTCA 默认本地跑，无网络监听
-- 数据存 `~/.mtca/` 或 `I:\PROJECTS\MTCA\mtca.db`
+- 数据存 `~/.mtca/` 或 `./mtca.db`
 - **加密**：依赖系统自带磁盘加密（BitLocker / FileVault）
 
 ---

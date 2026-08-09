@@ -61,7 +61,7 @@
 
 | 项 | 值 |
 |---|---|
-| 项目路径 | `I:\PROJECTS\MTCA\` |
+| 项目路径 | `./` |
 | 协议 | MIT → 建议改 AGPL-3.0（M5 时）|
 | 版本 | v0.4（设计锁定）|
 | 代码行数 | 0（设计阶段）|
@@ -249,7 +249,7 @@ T0 ─┬─► T1 ─┬─► T2 ─┬─► T3
 **预计工时**：0.5h
 **依赖**：无
 **关键产出**：
-- `I:\PROJECTS\MTCA\.gitignore`（已存在，确认）
+- `./.gitignore`（已存在，确认）
 - 9 个 `src/<module>/` 目录
 - 1 个 git commit
 
@@ -258,7 +258,7 @@ T0 ─┬─► T1 ─┬─► T2 ─┬─► T3
 ```
 你是一个 Python 项目初始化 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：初始化 MTCA 项目仓库骨架。
 
@@ -339,13 +339,13 @@ ls tests/
 ```
 你是一个 Python SQLite 架构 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 MTCA 存储层（src/store/sqlite.py）。
 
 必读（用 Read 工具读这些文件）：
-1. I:\PROJECTS\MTCA\DEVELOPER_PLAN.md 第 2.2 节 - 完整 schema
-2. I:\PROJECTS\MTCA\docs\DATA_MODEL.md 第 2 节 - 不可变约束
+1. ./DEVELOPER_PLAN.md 第 2.2 节 - 完整 schema
+2. ./docs\DATA_MODEL.md 第 2 节 - 不可变约束
 
 实现文件 1：src/store/sqlite.py
 - 6 张表 CREATE TABLE：sessions, messages, segments, segment_relations, views, score_events, fog_session
@@ -430,7 +430,7 @@ pytest tests/test_store_sqlite.py -v
 ```
 你是一个 Python 数据库写入 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 L0-细节 消息写入（src/l0/session_writer.py）。
 
@@ -499,7 +499,7 @@ pytest tests/test_session_writer.py -v
 ```
 你是一个 Python NLP 工具 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 L0-骨架 锚点生成（src/l0/skeleton.py）。
 
@@ -571,7 +571,7 @@ pytest tests/test_skeleton.py -v
 ```
 你是一个 Python 时间序列分析 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现时间分段器（src/l0/time_segmenter.py）。
 
@@ -646,7 +646,7 @@ pytest tests/test_time_segmenter.py -v
 ```
 你是一个 Python 集成 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现段落写入器（src/l0/segment_writer.py）。
 
@@ -705,7 +705,7 @@ pytest tests/test_segment_writer.py -v
 ```
 你是一个 Python 安全操作 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现雾化引擎（src/fog/fog_engine.py）。
 
@@ -779,7 +779,7 @@ pytest tests/test_fog_engine.py -v
 ```
 你是一个 Python 调度算法 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现动态打分引擎（src/compress/scoring.py）。
 
@@ -864,7 +864,7 @@ pytest tests/test_scoring.py -v
 ```
 你是一个 Python 检索 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现召回引擎（src/recall/recall_engine.py）。
 
@@ -936,7 +936,7 @@ pytest tests/test_recall_basic.py -v
 ```
 你是一个 Python 状态机 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现雾化召回协议（src/recall/fog_protocol.py）。
 
@@ -1002,7 +1002,7 @@ pytest tests/test_fog_protocol.py -v
 ```
 你是一个 Python 抽象工厂 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 LLM 抽象层（src/llm/provider.py）。
 
@@ -1079,7 +1079,7 @@ pytest tests/test_llm_provider.py -v
 ```
 你是一个 Python CLI AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 CLI 用户控制命令（src/cli/user_controls.py）。
 
@@ -1127,7 +1127,7 @@ pytest tests/test_llm_provider.py -v
 ```
 你是一个 Python 终端 UI AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 CLI 时间线（src/cli/timeline.py）。
 
@@ -1177,7 +1177,7 @@ pytest tests/test_llm_provider.py -v
 ```
 你是一个 Python GUI AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 GUI MVP（时间线 + 话题树 + 雾化按钮）。
 
@@ -1250,7 +1250,7 @@ python gui/run.py
 ```
 你是一个 Python 测试 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：补充召回测试到 50 段用例。
 
@@ -1282,7 +1282,7 @@ python gui/run.py
 ```
 你是一个 Python 测试 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：补全雾化测试。
 
@@ -1313,7 +1313,7 @@ python gui/run.py
 ```
 你是一个 JSON 数据生成 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：生成测试数据集（benchmarks/test_set.json）。
 
@@ -1349,7 +1349,7 @@ python gui/run.py
 ```
 你是一个技术文档 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：写 [文档名]。
 
@@ -1383,7 +1383,7 @@ python gui/run.py
 ```
 你是一个 Python 调度 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 retention 引擎（src/lifecycle/retention_engine.py）。
 
@@ -1423,7 +1423,7 @@ python gui/run.py
 ```
 你是一个 Python 交互 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 AI 询问升级（src/lifecycle/ask_restore.py）。
 
@@ -1465,7 +1465,7 @@ python gui/run.py
 ```
 你是一个 Python NLP AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现矛盾检测（src/lifecycle/contradiction_detector.py）。
 
@@ -1512,7 +1512,7 @@ python gui/run.py
 ```
 你是一个 Python 图算法 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现关系图谱（src/relations/graph.py）。
 
@@ -1557,7 +1557,7 @@ python gui/run.py
 ```
 你是一个 Python 异步任务 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现摘要重写（src/compress/regen_engine.py）。
 
@@ -1602,7 +1602,7 @@ python gui/run.py
 ```
 你是一个 Python GUI 可视化 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：实现 GUI 知识图谱视图（gui/graph_view.py）。
 
@@ -1646,7 +1646,7 @@ python gui/run.py
 ```
 你是一个 Python 测试 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：关系图测试（tests/test_relations_graph.py）。
 
@@ -1674,7 +1674,7 @@ python gui/run.py
 ```
 你是一个 Python 测试 AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：重写测试（tests/test_regen_engine.py）。
 
@@ -1955,7 +1955,7 @@ rm -rf src/__pycache__ src/*/__pycache__ tests/__pycache__
 ```
 你是一个 [角色：Python 后端 / 测试 / 文档 / GUI] AI。
 
-工作目录：I:\PROJECTS\MTCA\
+工作目录：./
 
 任务：[一句话说明]
 
@@ -1991,7 +1991,7 @@ rm -rf src/__pycache__ src/*/__pycache__ tests/__pycache__
 ## 附录 A: 文件路径速查
 
 ```
-I:\PROJECTS\MTCA\
+./
 ├── README.md
 ├── DEVELOPER_PLAN.md
 ├── HANDOVER_XIAOBA.md

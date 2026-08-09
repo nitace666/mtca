@@ -131,10 +131,10 @@ Step 2: ...
 
 ## 9. 关键文件清单（先读这 4 个理解全貌）
 
-1. I:\PROJECTS\MTCA\SESSION_NOTES_2026-07-06.md（前任交接笔记，2k tokens）
-2. I:\PROJECTS\MTCA\benchmarks\M2.5_report.md（M2.5 验收报告，含 9 铁律 + 已知问题 + M3 启动建议）
-3. I:\PROJECTS\MTCA\M2.5_PLAYBOOK.md（M2.5 高层设计，T29-T35）
-4. I:\PROJECTS\MTCA\AI_RULES.md（项目规则）
+1. ./SESSION_NOTES_2026-07-06.md（前任交接笔记，2k tokens）
+2. ./benchmarks\M2.5_report.md（M2.5 验收报告，含 9 铁律 + 已知问题 + M3 启动建议）
+3. ./M2.5_PLAYBOOK.md（M2.5 高层设计，T29-T35）
+4. ./AI_RULES.md（项目规则）
 
 读完这 4 个就够开始工作。
 

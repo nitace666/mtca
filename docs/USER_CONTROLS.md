@@ -317,7 +317,7 @@ def render_tree(project=None):
 老板对数据库的直接访问：
 
 ```bash
-sqlite3 I:\PROJECTS\MTCA\mtca.db
+sqlite3 ./mtca.db
 
 sqlite> SELECT started_at, topic_label, current_tier, current_score, fog_state, silence_state
         FROM segments ORDER BY started_at DESC LIMIT 20;

@@ -132,7 +132,7 @@ ollama / lmstudio / llamacpp / cloud 4 后端 + factory + mock fallback 已在 s
 ## 下次开新对话第一句话模板
 
 ```
-读 I:\PROJECTS\MTCA\SESSION_NOTES_2026-07-06.md 继续 M2.5.7 收尾。
+读 ./SESSION_NOTES_2026-07-06.md 继续 M2.5.7 收尾。
 ```
 
 ## 文件位置参考
